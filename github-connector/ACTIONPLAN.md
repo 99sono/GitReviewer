@@ -3,6 +3,11 @@
 ## Overview
 This module will implement GitHub API integration for fetching pull request data and posting review comments. It will serve as the external interface for the code review system.
 
+## Package Structure
+- **Base Package**: `sono99.githubconnector`
+- **Main Classes**: `sono99.githubconnector.GitHubPullRequestService`, `sono99.githubconnector.GitHubClient`
+- **Supporting Classes**: `sono99.githubconnector.*` (PullRequestData, CommentPoster, etc.)
+
 ## Key Requirements from Specifications
 
 ### From delete_me/04.md

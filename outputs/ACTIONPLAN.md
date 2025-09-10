@@ -3,6 +3,11 @@
 ## Overview
 This module will implement the formatting and rendering of code review findings for various output channels, with a focus on GitHub inline comments.
 
+## Package Structure
+- **Base Package**: `sono99.outputs`
+- **Main Classes**: `sono99.outputs.GitHubInlineRenderer`, `sono99.outputs.FindingFormatter`
+- **Supporting Classes**: `sono99.outputs.*` (CommentRenderer, DeduplicationService, etc.)
+
 ## Key Requirements from Specifications
 
 ### From delete_me/01.md and 12A.md/12b.md

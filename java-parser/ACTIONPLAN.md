@@ -3,6 +3,11 @@
 ## Overview
 This module will implement Java source code parsing using JavaParser to create structured AST representations for code analysis.
 
+## Package Structure
+- **Base Package**: `sono99.javaparser`
+- **Main Classes**: `sono99.javaparser.JavaParsingService`, `sono99.javaparser.JavaParsingNode`
+- **Supporting Classes**: `sono99.javaparser.*` (AnnotationInfo, Modifier, EnrichedContent, etc.)
+
 ## Key Requirements from Specifications
 
 ### From delete_me/02A.md and 02b.md

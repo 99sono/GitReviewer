@@ -3,6 +3,11 @@
 ## Overview
 This module will implement the core diff parsing functionality to support code review analysis. The focus is on parsing unified diffs and creating mappings that can be intersected with AST nodes.
 
+## Package Structure
+- **Base Package**: `sono99.diffmapper`
+- **Main Classes**: `sono99.diffmapper.DiffParser`, `sono99.diffmapper.DiffMapping`
+- **Supporting Classes**: `sono99.diffmapper.*` (DiffFile, LineRange, etc.)
+
 ## Key Requirements from Specifications
 
 ### From delete_me/01.md

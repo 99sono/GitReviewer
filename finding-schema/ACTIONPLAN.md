@@ -3,6 +3,11 @@
 ## Overview
 This module will implement the core data models for code review findings with comprehensive Javadoc and unit tests.
 
+## Package Structure
+- **Base Package**: `sono99.findingschema`
+- **Main Classes**: `sono99.findingschema.Finding`, `sono99.findingschema.FindingLocation`
+- **Supporting Classes**: `sono99.findingschema.*` (FindingProvenance, FindingSeverity, etc.)
+
 ## Key Requirements from Specifications
 
 ### From delete_me/01.md and 12A.md/12b.md

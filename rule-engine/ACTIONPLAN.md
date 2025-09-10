@@ -3,6 +3,11 @@
 ## Overview
 This module will implement the core rule execution framework that supports both traditional static analysis rules and LLM-powered intelligent code review.
 
+## Package Structure
+- **Base Package**: `sono99.ruleengine`
+- **Main Classes**: `sono99.ruleengine.RuleRunner`, `sono99.ruleengine.RuleContext`
+- **Supporting Classes**: `sono99.ruleengine.*` (Rule, Finding, LLMRule, etc.)
+
 ## Key Requirements from Specifications
 
 ### From delete_me/01.md and 12A.md/12b.md

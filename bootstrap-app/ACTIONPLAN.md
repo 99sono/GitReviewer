@@ -3,6 +3,11 @@
 ## Overview
 This module will implement the main Spring Boot application that orchestrates the entire code review workflow, integrating all other modules.
 
+## Package Structure
+- **Base Package**: `sono99.bootstrap`
+- **Main Classes**: `sono99.bootstrap.CodeReviewApplication`, `sono99.bootstrap.CodeReviewService`
+- **Supporting Classes**: `sono99.bootstrap.*` (PullRequestProcessor, CodeAnalysisOrchestrator, etc.)
+
 ## Key Requirements from Specifications
 
 ### From delete_me/01.md and 12A.md/12b.md

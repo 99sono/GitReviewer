@@ -3,6 +3,11 @@
 ## Overview
 This module will implement data models for LLM-generated findings with comprehensive provenance tracking and telemetry.
 
+## Package Structure
+- **Base Package**: `sono99.llmfindingschema`
+- **Main Classes**: `sono99.llmfindingschema.LLMInlineFinding`, `sono99.llmfindingschema.LLMProvenance`
+- **Supporting Classes**: `sono99.llmfindingschema.*` (LLMRequestTelemetry, LLMPostingEnvelope, etc.)
+
 ## Key Requirements from Specifications
 
 ### From delete_me/12A.md/12b.md
