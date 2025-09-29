@@ -1,0 +1,9 @@
+{
+    "java.configuration.updateBuildConfiguration": "interactive",
+    "java.compile.nullAnalysis.mode": "disabled",
+    "java.format.settings.profile": "GoogleStyle",
+    "java.format.organizeImports": true,
+    "editor.formatOnSave": true,
+    "java.format.settings.url": ".eclipse-java-google-style.xml",
+    "java.format.onType": true
+}

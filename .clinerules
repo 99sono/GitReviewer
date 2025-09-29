@@ -1,0 +1,79 @@
+# CLINE Rules for GitReviewer Project
+
+These guidelines ensure AI-generated code aligns with project standards, reducing manual fixes and maintaining consistency in this Spring Boot/Java 21 multi-module app.
+
+## General Coding Standards
+- Always use Java 21 features: Prefer records for immutable data classes (e.g., EnrichedContent), text blocks for multiline strings, switch expressions.
+- Follow Google Java Style via checkstyle.xml: 4-space indents, 120 max line length, sorted imports (java/javax/org/com groups, separated by blank lines).
+- Use .editorconfig settings: UTF-8, LF endings, trim whitespace, 4 spaces.
+- Imports: Sort alphabetically within groups; avoid wildcard imports except for static.
+- Naming: camelCase for methods/variables, PascalCase for classes, UPPER_SNAKE for constants.
+- Javadoc: Required for public classes/methods; use @param, @return; follow JavadocStyle checks.
+- Exceptions: Use unchecked where possible; prefer specific over Exception; log with SLF4J.
+
+## Architecture & Design
+- Modularity: Changes in one module (e.g., java-parser) shouldn't break others. Use interfaces for decoupling (e.g., ParserBackend).
+- Spring Boot: Annotate services with @Service, repositories @Repository; use constructor injection; configure in application.yml.
+- Dependency Injection: Favor @Autowired by constructor; no field injection.
+- Immutability: Use final fields; records or immutable collections (List.of, Map.of) where possible.
+- Testing: Write JUnit 5 tests for all new code; use Mockito for mocks; AssertJ for assertions; cover 80%+.
+- Test Documentation: Every unit test must have Javadoc explaining the test's purpose (what functionality it validates) and added value (why the test matters for code quality). Use format: /** Test that [behavior]. Ensures [why important]. */
+
+## JavaParser Module Specific
+- AST Parsing: Use com.github.javaparser.StaticJavaParser; preserve positions with LexicalPreservingPrinter if needed.
+- Node Model: JavaParsingNode should be hierarchical (children for nested elements); include ranges, modifiers, annotations.
+- Enrichment: For JavadocRef/AnnotationRef, extract via VoidVisitor; handle null cases gracefully.
+- Performance: Avoid deep cloning AST; use caching for repeated parses; limit to relevant files.
+- Error Handling: Fallback for parse errors (e.g., syntax errors log and skip); throw custom parser exceptions.
+
+## Build & Tools
+- Maven: Ensure mvn clean install succeeds; respect dependencyManagement.
+- CI: Code must pass GitHub Actions (Checkstyle, tests).
+- Git: Commit messages conventional (feat/fix/docs/refactor); no force pushes.
+
+## AI Generation Tips
+- Be explicit in responses: Explain changes (e.g., "Added record for NodeKind due to immutability").
+- Incremental: Use replace_in_file for targeted edits; verify with tools like list_code_definition_names.
+- Avoid: Lombok (unless explicit), raw types, deprecated APIs; no magic numbers.
+- Line comments: Add inline comments for multi-step methods using numbered pattern // (a) First step, // (b) Second step, etc. Exception: Simple methods use plain line comments without numbering/metadata.
+- Visibility: Prefer protected/public over private for methods/fields in service classes for extensibility; avoid private where possible.
+- No inner classes: Use top-level classes for all logic (e.g., visitors as separate files); package-private or protected for internal access.
+
+## Code Style & LLM Development Workflow
+
+### VS Code Integration
+- **Format on Save**: VS Code automatically formats code using Google Java Style when files are saved
+- **Automatic Formatting**: Generated code will be styled according to Google conventions without manual intervention
+- **Build Conflicts**: Despite VS Code formatting, strict Checkstyle rules may still cause `mvn compile` failures
+
+### Important Warning for LLM-Generated Code
+- **Style vs. Build Success**: VS Code's "format on save" ensures Google style but does NOT guarantee Checkstyle compliance
+- **Always Test Builds**: Run `mvn clean compile` after generating code to verify Checkstyle rules pass
+- **Checkstyle Runs on Compile**: The build process enforces strict style rules - formatting alone is insufficient
+- **Common Failure Points**: Javadoc formatting, import organization, and specific code structure rules
+
+### Best Practices for LLM Code Generation
+- **Generate Clean Code**: Write code that follows Google Java Style from the start
+- **Verify with Build**: Always run `mvn compile` to ensure Checkstyle compliance
+- **Fix Checkstyle Issues**: If build fails, address the specific Checkstyle violations (not just formatting)
+- **Use Spotless for Bulk Formatting**: Run `mvn spotless:apply` to format entire codebase when needed
+
+## Versioning and Package Structure
+All code in GitReviewer follows a structured, versioned approach to ensure reliable, independent APIs across sub-modules (e.g., java-parser as a pluggable service for AST processing). Each sub-module (Maven artifact) enforces:
+
+- **api/**: Public contracts only (interfaces in `api/{version}/service/`, DTOs in `api/{version}/model/`). Use `com.sono99.{sub_module}.api.{version}` (e.g., `com.sono99.javaparser.api.v1`). Stable and version-specific; no internal deps. Exported as separate artifact (e.g., sono99:java-parser-api-v1). Consumers depend only on this; changes are additive or major (e.g., v2 for breaking).
+
+- **impl/**: Internal implementation, not in public artifacts.
+  - **generic/**: Backend-agnostic core logic (`com.sono99.{sub_module}.impl.generic`). Includes canonical models (DTOs/records in `impl.generic.model/`, e.g., `JavaParsingNode` for AST), services (`impl.generic.service/`), and backends. Blackbox: No version awareness, uses internal models optimized for efficiency (e.g., with backend refs). Evolves independently.
+  - **{version}/** (`com.sono99.{sub_module}.impl.{version}`): Bridge adapters (e.g., `impl.v1/`). Implement API interfaces (e.g., `JavaParsingServiceV1Impl`) and delegate to impl.generic. Handle boilerplate conversions:
+    - Generic canonical models (e.g., `EnrichedContent` from impl.generic.model) → versioned API DTOs (e.g., `EnrichedContentV1`, sanitizing internals like `backend` for security/stability).
+    - Incoming API inputs → generic inputs (minimal).
+    - Use mappers (e.g., manual or MapStruct) for bidirectional translation; accept ~20-30% boilerplate for strong isolation.
+
+- **Sub-Module Requirements**: Every module (e.g., java-parser, rule-engine) must have `api/`, `impl/generic/`, and `impl/{version}/` (start with v1). No cross-module impl deps; use API versions for coupling. Models: Java 21 records for immutability in generic/impl; API DTOs mirror but hide internals.
+- **Enforcement**: Separate Maven sub-artifacts (api-v1.jar, impl-core.jar, impl-v1.jar). .clinerules/CI validate no API→impl deps. Tests check conversion round-trips (generic ↔ API). Breaking changes: New version (v2) without touching existing.
+- **Trade-offs & Benefits**: Boilerplate for conversions ensures API stability (internal changes don't break consumers) and scalability (e.g., v1 basic, v2 AI-enriched). Fits GitReviewer's multi-module: e.g., github-connector uses java-parser-api-v1.
+
+This builds on existing architecture (modularity, interfaces for decoupling) and immutability rules.
+
+Last updated: 2025-09-30

@@ -1,0 +1,97 @@
+<?xml version="1.0"?>
+<!DOCTYPE module PUBLIC
+          "-//Checkstyle//DTD Checkstyle Configuration 1.3//EN"
+          "https://checkstyle.org/dtds/configuration_1_3.dtd">
+
+<!-- 
+Based on Google Java Style, adapted for Java 21 with 4-space indents and 120 line length.
+Aligned with .editorconfig.
+-->
+
+<module name="Checker">
+  <!-- Global file/directory settings -->
+  <property name="charset" value="UTF-8"/>
+  <property name="severity" value="error"/>
+  <property name="fileExtensions" value="java,xml,properties,yml"/>
+
+  <!-- Suppressions -->
+  <module name="SuppressFile"/>
+
+  <!-- Line length: 120 chars -->
+  <module name="TreeWalker">
+    <module name="RegexpSinglelineJava">
+      <property name="format" value="^.{121}.*$\n"/>
+      <property name="message" value="Line too long - max length is 120"/>
+    </module>
+
+    <!-- Indentation: 4 spaces -->
+    <module name="Indentation">
+      <property name="basicOffset" value="4"/>
+      <property name="braceAdjustment" value="4"/>
+      <property name="caseIndent" value="4"/>
+      <property name="lineWrappingIndentation" value="4"/>
+      <property name="tabWidth" value="4"/>
+    </module>
+
+    <!-- Import order -->
+    <module name="IllegalImport">
+      <property name="illegalPkgs" value="sun.,com.sun.,sun.reflect.,sun.security."/>
+    </module>
+    <module name="ImportOrder">
+      <property name="importGroups" value="java,javax,org,com"/>
+      <property name="separatedByBlankLine" value="true"/>
+      <property name="sortImportsInGroupAlphabetically" value="true"/>
+    </module>
+
+    <!-- Naming conventions -->
+    <module name="ConstantName"/>
+    <module name="MemberName"/>
+    <module name="MethodName"/>
+    <module name="PackageName"/>
+    <module name="ParameterName"/>
+
+    <!-- Whitespace -->
+    <module name="WhitespaceAround">
+      <property name="allowEmptyMethods" value="true"/>
+      <property name="allowEmptyLoops" value="true"/>
+    </module>
+    <module name="NoWhitespaceBefore"/>
+    <module name="GenericWhitespace"/>
+
+    <!-- Modifiers and declarations -->
+    <module name="ModifierOrder">
+      <property name="order" value="public, protected, package, private, abstract, static, final, transient, volatile, synchronized, native, strictfp, interface, anonymous, enum"/>
+    </module>
+    <module name="FinalParameters"/>
+    <module name="HiddenField"/>
+
+    <!-- Comments and Javadoc -->
+    <module name="JavadocMethod"/>
+    <module name="JavadocType"/>
+    <module name="JavadocStyle"/>
+
+    <!-- Other best practices -->
+    <module name="UpperEll"/>
+    <module name="FallThrough"/>
+    <module name="EqualsHashCode"/>
+    <module name="OneStatementPerLine"/>
+    <module name="AvoidNestedBlocks"/>
+    <module name="EmptyBlock"/>
+    <module name="EmptyStatement"/>
+    <module name="UnnecessarySemicolon"/>
+    <module name="LeftCurly"/>
+    <module name="RightCurly"/>
+
+    <!-- For loops -->
+    <module name="StrictForLoop"/>
+
+    <!-- Annotations -->
+    <module name="AnnotationLocation"/>
+
+    <!-- Arrays -->
+    <module name="ArrayTypeStyle"/>
+
+    <!-- Exceptions -->
+    <module name="AvoidEscapedUnicodeCharacters"/>
+  </module>
+</module>

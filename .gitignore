@@ -1,6 +1,10 @@
 # Compiled class file
 *.class
 
+# prompt to not commit
+deleteMePrompt*.md
+
+
 # Log file
 *.log
 

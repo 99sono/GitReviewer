@@ -6,11 +6,12 @@
     <modelVersion>4.0.0</modelVersion>
 
     <parent>
-        <groupId>com.example</groupId>
+        <groupId>com.sono99</groupId>
         <artifactId>code-reviewer</artifactId>
         <version>1.0.0-SNAPSHOT</version>
     </parent>
 
+    <groupId>com.sono99</groupId>
     <artifactId>java-parser</artifactId>
     <name>Java Parser Module</name>
     <description>Module for parsing Java source code using JavaParser</description>
