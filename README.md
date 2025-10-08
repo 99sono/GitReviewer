@@ -17,18 +17,22 @@ This project aims to create a **simple-to-use Spring Boot application** that ena
 
 ## 📁 Project Structure
 
-```
-├── java-parser/           # Java AST parsing using JavaParser
-├── diff-mapper-core/      # Unified diff parsing and intersection
-├── github-connector/      # GitHub API integration
-├── rule-engine/           # Framework for analysis rules
-├── outputs/               # Finding formatting and rendering
-├── bootstrap-app/         # Main Spring Boot application
-├── finding-schema/        # Core data models for findings
-├── llm-finding-schema/    # LLM-specific data models
-├── metadata/              # Development tracking and summaries
-└── delete_me/             # Specification documents
-```
+The project follows a modular Maven structure with dependencies flowing from data models to parsing, analysis, integration, and the main app.
+
+| Module            | Description                              |
+|-------------------|------------------------------------------|
+| finding-schema    | Core data models for code findings       |
+| llm-finding-schema | LLM-specific extensions to schemas         |
+| java-parser       | Java AST parsing using JavaParser        |
+| diff-mapper-core  | Unified diff parsing and AST intersection|
+| github-connector  | GitHub API integration for PRs           |
+| rule-engine       | Framework for analysis rules             |
+| outputs           | Finding formatting and rendering         |
+| bootstrap-app     | Main Spring Boot application             |
+
+Additional folders:
+- metadata/              # Development tracking and summaries
+- delete_me/             # Original specification documents
 
 ## 🛠️ Technology Stack
 
@@ -38,6 +42,43 @@ This project aims to create a **simple-to-use Spring Boot application** that ena
 - **LangChain4j** - LLM integration
 - **GitHub API** - Repository integration
 - **Maven** - Build and dependency management
+
+## 🎨 Code Style & Formatting
+
+This project uses **Google Java Style** conventions for consistent, professional code formatting across the entire codebase.
+
+### Style System Components
+
+- **Checkstyle Plugin**: Enforces coding standards during Maven builds with error-level severity
+- **Spotless Plugin**: Automated code formatting using Google Java Format for consistent style
+- **VS Code Integration**: Format-on-save configured for Google style conventions
+
+### Key Features
+
+- **Automated Formatting**: `mvn spotless:apply` formats the entire codebase to Google style
+- **Build Enforcement**: Checkstyle runs during `mvn compile` and fails on style violations
+- **IDE Integration**: VS Code automatically formats code on save using Google conventions
+- **Convenient Tooling**: Well-supported Google style works seamlessly across Maven, VS Code, and CI/CD
+
+### Usage Commands
+
+```bash
+# Format entire codebase
+mvn spotless:apply
+
+# Check for style violations (runs automatically during compile)
+mvn checkstyle:check
+
+# Clean build (includes style checking)
+mvn clean compile
+```
+
+### Benefits
+
+- **Consistency**: Uniform code style across all developers and environments
+- **Automation**: No manual formatting decisions - tools handle everything
+- **Quality**: Catches common style issues before they reach production
+- **Productivity**: Developers focus on logic, not formatting debates
 
 ## 🎯 Use Cases
 
