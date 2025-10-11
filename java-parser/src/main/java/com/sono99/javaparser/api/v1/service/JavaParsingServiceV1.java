@@ -1,6 +1,6 @@
 package com.sono99.javaparser.api.v1.service;
 
-import com.sono99.javaparser.api.v1.model.CompilcationUnitNodeV1;
+import com.sono99.javaparser.api.v1.model.CompilationUnitNodeV1;
 import java.io.InputStream;
 
 /**
@@ -16,10 +16,20 @@ public interface JavaParsingServiceV1 {
    *
    * @param source the InputStream containing the Java source code
    * @param sourceName the logical name of the source (e.g., file name or PR path for logging)
-   * @return CompilcationUnitNodeV1 containing the parsed AST, nodes, and metadata
+   * @return CompilationUnitNodeV1 containing the parsed AST, nodes, and metadata
    * @throws RuntimeException if parsing fails due to syntax errors or IO issues
    */
-  CompilcationUnitNodeV1 parse(InputStream source, String sourceName);
+  CompilationUnitNodeV1 parse(InputStream source, String sourceName);
+
+  /**
+   * Parses Java source code from a String and returns the enriched content representation.
+   *
+   * @param source the String containing the Java source code
+   * @param repositoryPath the path to the source file in the repository
+   * @return CompilationUnitNodeV1 containing the parsed AST, nodes, and metadata
+   * @throws RuntimeException if parsing fails due to syntax errors
+   */
+  CompilationUnitNodeV1 parseCompilationUnit(String source, String repositoryPath);
 
   /**
    * Determines if the given InputStream can be parsed as Java source code. Performs basic
