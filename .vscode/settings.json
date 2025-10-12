@@ -1,9 +1,14 @@
 {
     "java.configuration.updateBuildConfiguration": "interactive",
     "java.compile.nullAnalysis.mode": "disabled",
-    "java.format.settings.profile": "GoogleStyle",
     "java.format.organizeImports": true,
+    "java.format.onType": true,
+    // "java.format.settings.profile": "GoogleStyle",
+    // "java.format.settings.url": ".eclipse-java-google-style.xml",
+    // Use the google formatter plugin from
+    // https://marketplace.visualstudio.com/items?itemName=mmilic.java-google-format
     "editor.formatOnSave": true,
-    "java.format.settings.url": ".eclipse-java-google-style.xml",
-    "java.format.onType": true
+    "[java]": {
+        "editor.defaultFormatter": "mmilic.java-google-format"
+    }
 }

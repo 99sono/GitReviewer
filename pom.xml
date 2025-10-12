@@ -190,9 +190,15 @@
                                 <file>${project.basedir}/../.eclipse-java-google-style.xml</file>
                             </eclipse>
                         </java -->
+                        <!-- 
+                            See: https://github.com/google/google-java-format
+                            There is no official google plugin for vs code.
+                            Therefore we make use of the plugin of Marko Milic
+                            https://marketplace.visualstudio.com/items?itemName=mmilic.java-google-format 
+                        -->
                         <java>
                             <googleJavaFormat>
-                                <version>1.24.0</version>
+                                <version>1.23.0</version>
                                 <style>GOOGLE</style>
                             </googleJavaFormat>
                         </java>
