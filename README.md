@@ -137,6 +137,43 @@ This project is designed to be modular and extensible. Contributions are welcome
  - [Java formatting and linting](https://code.visualstudio.com/docs/java/java-linting)
  - [eclipse-java-google-style.xml](https://raw.githubusercontent.com/google/styleguide/gh-pages/eclipse-java-google-style.xml)
 
+### VS Code Formatter Configuration
+
+**Configuration Background**: The project uses Google Java Format style in the Spotless Maven plugin for automated formatting. While the Eclipse formatter would have been the path of least resistance (requiring only Checkstyle configuration adjustments), we committed to Google Java Format from the start. Since Google doesn't provide an official VS Code plugin, we use a third-party extension that mimics the Google Java Format style.
+
+#### Setup Instructions
+
+1. **Install the Google Java Format Extension**:
+   - Install the VS Code extension from Marko Milic: [Java Google Format](https://marketplace.visualstudio.com/items?itemName=mmilic.java-google-format)
+   - Note: There is no official Google plugin for VS Code, so we use Marko Milic's extension
+
+2. **Configure VS Code Settings**:
+   - Open Command Palette (`Ctrl+Shift+P`)
+   - Select "Dev Containers: Settings" and set format to JSON
+   - Add the following configuration to your `.vscode/settings.json`:
+
+   ```json
+   {
+     "editor.formatOnSave": true,
+     "[java]": {
+       "editor.defaultFormatter": "mmilic.java-google-format"
+     }
+   }
+   ```
+
+3. **Resolve Formatter Conflicts**:
+   - The first time you use "Format Document" (`Shift+Alt+F`), VS Code will prompt you to choose between formatters
+   - Select the **Google Java Format** option (Marko Milic's extension)
+   - This setting is configured globally
+
+#### Alternative Future Option
+
+> **Note**: We may consider switching back to the native Eclipse formatter in the future as it presents fewer configuration obstacles. The current Google formatter setup is chosen for its compatibility with the Spotless plugin used in our Maven build process.
+
+#### Reference
+
+For complete Google Java Style guidelines, see: [Google Java Style Guide](https://google.github.io/styleguide/javaguide.html)
+
 ## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
