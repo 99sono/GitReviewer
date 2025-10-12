@@ -1,21 +1,13 @@
-# api/v1/service: Public v1 Service Interfaces
+# api/v1/service: Public v1 API Service Interfaces
 
 ## Purpose
-This sub-package contains the stable, versioned interfaces for core services in the v1 API, defining contracts for parsing Java source into enriched ASTs. It enables external modules (e.g., github-connector fetching PR files, rule-engine analyzing nodes) to interact with java-parser without internal knowledge. Interfaces are simple, extensible, and return versioned DTOs from api/v1/model. Part of sono99:java-parser-api-v1 artifact; no impl exposure.
+This package defines the public service interfaces for the `java-parser` module's v1 API. These interfaces establish the contract for how external consumers interact with the parsing functionality, ensuring a stable and versioned API. Implementations of these interfaces are found in the `impl/v1/service` package, which adapt calls to the internal generic logic.
 
-## Key Classes
-- `JavaParsingServiceV1`: Primary interface for AST parsing.
-  - `EnrichedContentV1 parse(InputStream source, String sourceName)`: Parses Java source to versioned enriched AST content.
-  - `boolean canParse(InputStream source, String sourceName)`: Validates if content is parsable as Java (e.g., header/extension check).
+## Key Characteristics
+- **Public Contract**: These interfaces are part of the public API and define the operations available to consumers.
+- **Versioned**: Specific to v1 of the API. Breaking changes to these interfaces would necessitate a new API version (e.g., v2).
+- **Decoupling**: Promotes loose coupling between the `java-parser` module and its consumers, as consumers depend only on these interfaces, not on concrete implementations.
+- **No Implementation Details**: These interfaces should only define method signatures and return types, without exposing any internal implementation specifics.
 
-## Dependencies
-- api/v1/model (DTOs); stdlib for InputStream.
-- No external libs or impl/generic deps.
-
-## Versioning Notes
-- v1: Streaming InputStream for large files, basic validation, enriched outputs.
-- Extensibility: Spring @Service impls in bridges; constructor injection.
-- Enforcement: .clinerules ensures @param/@return Javadocs; no unchecked deps.
-- Future v2: Add async or advanced features.
-
-Consumers declare dependency on the interface for loose coupling.
+## Usage
+External modules and applications will depend on these interfaces to utilize the `java-parser`'s functionality. The actual logic is handled by implementations that bridge to the `impl/generic` core.

@@ -132,6 +132,11 @@ This project is designed to be modular and extensible. Contributions are welcome
 - Performance optimizations
 - Documentation improvements
 
+## Java formatting
+
+ - [Java formatting and linting](https://code.visualstudio.com/docs/java/java-linting)
+ - [eclipse-java-google-style.xml](https://raw.githubusercontent.com/google/styleguide/gh-pages/eclipse-java-google-style.xml)
+
 ## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.

@@ -33,6 +33,7 @@ These guidelines ensure AI-generated code aligns with project standards, reducin
 
 ## AI Generation Tips
 - Be explicit in responses: Explain changes (e.g., "Added record for NodeKind due to immutability").
+- **Imports**: Prefer adding or updating import statements in the import section rather than using fully qualified names directly in the code, unless there is a specific reason (e.g., name collision) that makes a fully qualified name unavoidable. This improves readability and maintainability.
 - Incremental: Use replace_in_file for targeted edits; verify with tools like list_code_definition_names.
 - Avoid: Lombok (unless explicit), raw types, deprecated APIs; no magic numbers.
 - Line comments: Add inline comments for multi-step methods using numbered pattern // (a) First step, // (b) Second step, etc. Exception: Simple methods use plain line comments without numbering/metadata.
@@ -55,7 +56,8 @@ These guidelines ensure AI-generated code aligns with project standards, reducin
 ### Best Practices for LLM Code Generation
 - **Generate Clean Code**: Write code that follows Google Java Style from the start
 - **Verify with Build**: Always run `mvn compile` to ensure Checkstyle compliance
-- **Fix Checkstyle Issues**: If build fails, address the specific Checkstyle violations (not just formatting)
+- **Fix Checkstyle Issues**: If build fails, address the specific Checkstyle violations (not just formatting).
+- **Automated Formatting**: For common formatting and import organization issues, consider running `mvn spotless:apply` to automatically fix them, especially when dealing with Checkstyle violations related to code style.
 - **Use Spotless for Bulk Formatting**: Run `mvn spotless:apply` to format entire codebase when needed
 
 ## Versioning and Package Structure

@@ -21,9 +21,6 @@ public class FieldDeclarationNodeV1 extends AbstractJavaNodeV1<FieldDeclaration>
   /** Associated Javadoc comment. */
   private final JavadocNodeV1 javadoc;
 
-  /** Associated annotations. */
-  private final List<AnnotationNodeV1> annotations;
-
   /**
    * Constructor for FieldDeclarationNodeV1.
    *
@@ -34,7 +31,6 @@ public class FieldDeclarationNodeV1 extends AbstractJavaNodeV1<FieldDeclaration>
    * @param javaCodeChunk the field declaration text
    * @param originalNode reference to the original JavaParser FieldDeclaration
    * @param javadoc the associated Javadoc comment, can be null
-   * @param annotations the associated annotations, can be null
    * @param children empty for fields
    */
   public FieldDeclarationNodeV1(
@@ -45,13 +41,11 @@ public class FieldDeclarationNodeV1 extends AbstractJavaNodeV1<FieldDeclaration>
       String javaCodeChunk,
       FieldDeclaration originalNode,
       JavadocNodeV1 javadoc,
-      List<AnnotationNodeV1> annotations,
       List<AbstractJavaNodeV1<? extends com.github.javaparser.ast.Node>> children) {
     super(startLine, endLine, javaCodeChunk, originalNode, children);
     this.name = name;
     this.type = type;
     this.javadoc = javadoc;
-    this.annotations = annotations != null ? List.copyOf(annotations) : List.of();
   }
 
   /**
@@ -79,14 +73,5 @@ public class FieldDeclarationNodeV1 extends AbstractJavaNodeV1<FieldDeclaration>
    */
   public JavadocNodeV1 getJavadoc() {
     return javadoc;
-  }
-
-  /**
-   * Gets the associated annotations.
-   *
-   * @return list of annotation nodes, may be empty
-   */
-  public List<AnnotationNodeV1> getAnnotations() {
-    return annotations;
   }
 }

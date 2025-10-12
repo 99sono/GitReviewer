@@ -21,9 +21,6 @@ public class FieldDeclarationNode extends AbstractJavaElementNode<FieldDeclarati
   /** Associated Javadoc comment. */
   private final JavadocNode javadoc;
 
-  /** Associated annotations. */
-  private final List<AnnotationNode> annotations;
-
   /**
    * Constructor for FieldDeclarationNode.
    *
@@ -34,7 +31,6 @@ public class FieldDeclarationNode extends AbstractJavaElementNode<FieldDeclarati
    * @param javaCodeChunk the field declaration text
    * @param originalNode reference to the original JavaParser FieldDeclaration
    * @param javadoc the associated Javadoc comment, can be null
-   * @param annotations the associated annotations, can be null
    * @param children empty for fields
    */
   public FieldDeclarationNode(
@@ -45,13 +41,11 @@ public class FieldDeclarationNode extends AbstractJavaElementNode<FieldDeclarati
       String javaCodeChunk,
       FieldDeclaration originalNode,
       JavadocNode javadoc,
-      List<AnnotationNode> annotations,
       List<AbstractJavaNode<? extends com.github.javaparser.ast.Node>> children) {
     super(startLine, endLine, javaCodeChunk, originalNode, children);
     this.name = name;
     this.type = type;
     this.javadoc = javadoc;
-    this.annotations = annotations != null ? annotations : List.of();
   }
 
   /**
@@ -69,7 +63,12 @@ public class FieldDeclarationNode extends AbstractJavaElementNode<FieldDeclarati
     }
 
     // Add annotations if present
-    if (annotations != null && !annotations.isEmpty()) {
+    List<AnnotationNode> annotations =
+        getChildren().stream()
+            .filter(AnnotationNode.class::isInstance)
+            .map(AnnotationNode.class::cast)
+            .toList();
+    if (!annotations.isEmpty()) {
       for (AnnotationNode annotation : annotations) {
         enriched.append(annotation.getJavaChunk()).append("\n");
       }
@@ -106,14 +105,5 @@ public class FieldDeclarationNode extends AbstractJavaElementNode<FieldDeclarati
    */
   public JavadocNode getJavadoc() {
     return javadoc;
-  }
-
-  /**
-   * Gets the associated annotations.
-   *
-   * @return list of annotation nodes, may be empty
-   */
-  public List<AnnotationNode> getAnnotations() {
-    return annotations;
   }
 }

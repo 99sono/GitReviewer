@@ -21,9 +21,6 @@ public class MethodDeclarationNode extends AbstractJavaElementNode<MethodDeclara
   /** Associated Javadoc comment. */
   private final JavadocNode javadoc;
 
-  /** Associated annotations. */
-  private final List<AnnotationNode> annotations;
-
   /**
    * Constructor for MethodDeclarationNode.
    *
@@ -34,7 +31,6 @@ public class MethodDeclarationNode extends AbstractJavaElementNode<MethodDeclara
    * @param javaCodeChunk the method implementation
    * @param originalNode reference to the original JavaParser MethodDeclaration
    * @param javadoc the associated Javadoc comment, can be null
-   * @param annotations the associated annotations, can be null
    * @param children method body contents
    */
   public MethodDeclarationNode(
@@ -45,13 +41,11 @@ public class MethodDeclarationNode extends AbstractJavaElementNode<MethodDeclara
       String javaCodeChunk,
       MethodDeclaration originalNode,
       JavadocNode javadoc,
-      List<AnnotationNode> annotations,
       List<AbstractJavaNode<? extends com.github.javaparser.ast.Node>> children) {
     super(startLine, endLine, javaCodeChunk, originalNode, children);
     this.name = name;
     this.signature = signature;
     this.javadoc = javadoc;
-    this.annotations = annotations != null ? annotations : List.of();
   }
 
   /**
@@ -69,7 +63,12 @@ public class MethodDeclarationNode extends AbstractJavaElementNode<MethodDeclara
     }
 
     // Add annotations if present
-    if (annotations != null && !annotations.isEmpty()) {
+    List<AnnotationNode> annotations =
+        getChildren().stream()
+            .filter(AnnotationNode.class::isInstance)
+            .map(AnnotationNode.class::cast)
+            .toList();
+    if (!annotations.isEmpty()) {
       for (AnnotationNode annotation : annotations) {
         enriched.append(annotation.getJavaChunk()).append("\n");
       }
@@ -106,14 +105,5 @@ public class MethodDeclarationNode extends AbstractJavaElementNode<MethodDeclara
    */
   public JavadocNode getJavadoc() {
     return javadoc;
-  }
-
-  /**
-   * Gets the associated annotations.
-   *
-   * @return list of annotation nodes, may be empty
-   */
-  public List<AnnotationNode> getAnnotations() {
-    return annotations;
   }
 }

@@ -1,12 +1,10 @@
 package com.sono99.javaparser.impl.v1.converter;
 
-import com.sono99.javaparser.api.v1.model.AnnotationNodeV1;
 import com.sono99.javaparser.api.v1.model.FieldDeclarationNodeV1;
 import com.sono99.javaparser.api.v1.model.JavadocNodeV1;
 import com.sono99.javaparser.impl.generic.model.FieldDeclarationNode;
 import com.sono99.javaparser.impl.v1.service.ConversionServiceV1;
 import com.sono99.javaparser.impl.v1.service.NodeConverterV1;
-import java.util.stream.Collectors;
 import org.springframework.stereotype.Component;
 
 /**
@@ -30,9 +28,6 @@ public class FieldDeclarationNodeConverterV1
         source.getJavadoc() == null
             ? null
             : conversionService.convert(source.getJavadoc(), JavadocNodeV1.class),
-        source.getAnnotations().stream()
-            .map(annotation -> conversionService.convert(annotation, AnnotationNodeV1.class))
-            .collect(Collectors.toList()),
         java.util.List.of());
   }
 

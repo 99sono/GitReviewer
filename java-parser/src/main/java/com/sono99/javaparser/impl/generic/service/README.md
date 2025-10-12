@@ -1,23 +1,13 @@
-# impl/generic/service: Canonical Processing Services (Internal)
+# impl/generic/service: Core Service Implementations for Internal Generic Logic
 
 ## Purpose
-This sub-package implements the core, version-agnostic processing logic for Java parsing, focusing on InputStream-to-AST transformation and enrichment. It acts as the engine within the blackbox impl/generic, producing canonical models for internal use. No direct exposure to API versions; delegates handle integration. Follows .clinerules: Use protected methods for extensibility, line comments for multi-step flows, unchecked exceptions.
+This package houses the core service interfaces and their implementations for the `java-parser` module's generic logic. These services encapsulate the fundamental operations of parsing, AST manipulation, and content enrichment, operating on the canonical data models defined in `impl/generic/model`. They are designed to be backend-agnostic and version-independent, forming the blackbox core of the `java-parser` module.
 
-## Key Classes
-- `JavaParsingService`: Main service for AST operations (can be @Service in Spring context, but pure here).
-  - `EnrichedContent parse(InputStream source, String sourceName)`: Parses to CompilationUnit, builds root JavaParsingNode tree via visitor, computes metadata/quickLinks (TODO: implement with StaticJavaParser and AstToNodeVisitor).
-  - `boolean canParse(InputStream source, String sourceName)`: Checks Java signature (e.g., "package ", "import ") or extension; minimal validation.
-- Future: Visitors (e.g., AstToNodeVisitor as top-level class) for tree population; enrichers for Javadoc/Annotation extraction.
+## Key Characteristics
+- **Internal Use Only**: These services are exclusively for internal consumption within the `java-parser` module, primarily by the version-specific bridge implementations.
+- **Version-Agnostic**: The logic within these services is independent of any specific API version, allowing for internal evolution without impacting external contracts.
+- **Core Functionality**: Contains the essential business logic for Java parsing and AST processing.
+- **Decoupled**: Does not depend on any API version-specific classes or interfaces, ensuring a clean separation of concerns.
 
-## Dependencies
-- impl/generic/model (canonical DTOs).
-- External: com.github.javaparser (StaticJavaParser, VoidVisitorAdapter).
-- No API/v1 or Spring deps (pure Java); logging via SLF4J.
-
-## Versioning Notes
-- Unversioned Core: Evolves independently (e.g., new visitor overrides for Java 21 features); bridges adapt outputs.
-- Blackbox: Returns internal EnrichedContent; performance opts (e.g., caching parses) don't affect API.
-- Enforcement: .clinerules requires // Step X line comments, no deep cloning.
-- Benefits: Supports Phase 3 (enrichment via dedicated visitors) and scalability (e.g., switch backends without API change).
-
-Services delegate to models for tree queries; used by impl/v1 mappers.
+## Usage
+Version-specific service implementations (e.g., in `impl/v1/service`) delegate to these generic services to perform the actual parsing and enrichment tasks. This design ensures that the core logic remains centralized and reusable across different API versions.

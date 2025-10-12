@@ -11,7 +11,7 @@ import com.sono99.javaparser.impl.generic.utils.SourceContentUtils;
  * <p>Uses manual service instantiation and setter injection for maximum speed and control during
  * development and debugging scenarios.
  */
-class ParseAnimalTest extends AbstractParseAnimalTest {
+class JavaParserServiceParseAnimalTest extends AbstractParseAnimalTest {
 
   /**
    * Creates a JavaParserService instance using manual instantiation for fast unit testing. Manually
