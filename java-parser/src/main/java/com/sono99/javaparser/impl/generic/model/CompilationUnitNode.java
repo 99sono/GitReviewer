@@ -71,14 +71,14 @@ public class CompilationUnitNode extends AbstractJavaNode<CompilationUnit> {
   }
 
   /**
-   * Gets all class declarations.
+   * Gets all class, record, interface, enum declarations.
    *
    * @return list of class declaration nodes
    */
-  public List<ClassDeclarationNode> getClassDeclarations() {
+  public List<TypeDeclarationNode> getTypeDeclarations() {
     return getChildren().stream()
-        .filter(ClassDeclarationNode.class::isInstance)
-        .map(ClassDeclarationNode.class::cast)
+        .filter(TypeDeclarationNode.class::isInstance)
+        .map(TypeDeclarationNode.class::cast)
         .toList();
   }
 
@@ -89,8 +89,8 @@ public class CompilationUnitNode extends AbstractJavaNode<CompilationUnit> {
    */
   public List<FieldDeclarationNode> getFieldDeclarations() {
     return getChildren().stream()
-        .filter(ClassDeclarationNode.class::isInstance)
-        .map(ClassDeclarationNode.class::cast)
+        .filter(TypeDeclarationNode.class::isInstance)
+        .map(TypeDeclarationNode.class::cast)
         .flatMap(cls -> cls.getChildren().stream())
         .filter(FieldDeclarationNode.class::isInstance)
         .map(FieldDeclarationNode.class::cast)
@@ -104,8 +104,8 @@ public class CompilationUnitNode extends AbstractJavaNode<CompilationUnit> {
    */
   public List<MethodDeclarationNode> getMethodDeclarations() {
     return getChildren().stream()
-        .filter(ClassDeclarationNode.class::isInstance)
-        .map(ClassDeclarationNode.class::cast)
+        .filter(TypeDeclarationNode.class::isInstance)
+        .map(TypeDeclarationNode.class::cast)
         .flatMap(cls -> cls.getChildren().stream())
         .filter(MethodDeclarationNode.class::isInstance)
         .map(MethodDeclarationNode.class::cast)

@@ -74,10 +74,10 @@ public class CompilationUnitNodeV1 extends AbstractJavaNodeV1<CompilationUnit> {
    *
    * @return list of class declaration nodes
    */
-  public List<ClassDeclarationNodeV1> getClassDeclarations() {
+  public List<TypeDeclarationNodeV1> getClassDeclarations() {
     return getChildren().stream()
-        .filter(ClassDeclarationNodeV1.class::isInstance)
-        .map(ClassDeclarationNodeV1.class::cast)
+        .filter(TypeDeclarationNodeV1.class::isInstance)
+        .map(TypeDeclarationNodeV1.class::cast)
         .toList();
   }
 }

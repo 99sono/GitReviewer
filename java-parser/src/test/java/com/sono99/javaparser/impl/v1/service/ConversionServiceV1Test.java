@@ -2,23 +2,23 @@ package com.sono99.javaparser.impl.v1.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.sono99.javaparser.api.v1.model.ClassDeclarationNodeV1;
 import com.sono99.javaparser.api.v1.model.CompilationUnitNodeV1;
 import com.sono99.javaparser.api.v1.model.FieldDeclarationNodeV1;
 import com.sono99.javaparser.api.v1.model.ImportDeclarationNodeV1;
 import com.sono99.javaparser.api.v1.model.MethodDeclarationNodeV1;
 import com.sono99.javaparser.api.v1.model.PackageDeclarationNodeV1;
+import com.sono99.javaparser.api.v1.model.TypeDeclarationNodeV1;
 import com.sono99.javaparser.impl.generic.model.CompilationUnitNode;
 import com.sono99.javaparser.impl.generic.service.JavaParserService;
 import com.sono99.javaparser.impl.generic.utils.SourceContentUtils;
 import com.sono99.javaparser.impl.v1.converter.AnnotationNodeConverterV1;
-import com.sono99.javaparser.impl.v1.converter.ClassDeclarationNodeConverterV1;
 import com.sono99.javaparser.impl.v1.converter.CompilationUnitNodeConverterV1;
 import com.sono99.javaparser.impl.v1.converter.FieldDeclarationNodeConverterV1;
 import com.sono99.javaparser.impl.v1.converter.ImportDeclarationNodeConverterV1;
 import com.sono99.javaparser.impl.v1.converter.JavadocNodeConverterV1;
 import com.sono99.javaparser.impl.v1.converter.MethodDeclarationNodeConverterV1;
 import com.sono99.javaparser.impl.v1.converter.PackageDeclarationNodeConverterV1;
+import com.sono99.javaparser.impl.v1.converter.TypeDeclarationNodeConverterV1;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -45,7 +45,7 @@ import org.springframework.test.context.ContextConfiguration;
       SourceContentUtils.class,
       // All converter classes need to be explicitly listed for Spring to discover them
       AnnotationNodeConverterV1.class,
-      ClassDeclarationNodeConverterV1.class,
+      TypeDeclarationNodeConverterV1.class,
       CompilationUnitNodeConverterV1.class,
       FieldDeclarationNodeConverterV1.class,
       ImportDeclarationNodeConverterV1.class,
@@ -113,7 +113,7 @@ class ConversionServiceV1Test {
         .isTrue();
 
     // Validate the class declaration conversion
-    ClassDeclarationNodeV1 classNode = v1Result.getClassDeclarations().get(0);
+    TypeDeclarationNodeV1 classNode = v1Result.getClassDeclarations().get(0);
     assertThat(classNode).isNotNull();
     assertThat(classNode.getName()).isEqualTo("Animal");
 
@@ -140,9 +140,9 @@ class ConversionServiceV1Test {
         .contains("public boolean isAnimalTypeValid()")
         .endsWith("}");
 
-    // Validate that we have the expected field and method children
+    // Validate that we have the expected field, method, and annotation children
     assertThat(classNode.getChildren()).isNotEmpty();
-    assertThat(classNode.getChildren()).hasSize(6); // 2 fields + 4 methods
+    assertThat(classNode.getChildren()).hasSize(9); // 3 class annotations + 2 fields + 4 methods
 
     // Validate field conversion
     List<FieldDeclarationNodeV1> fields = classNode.getFieldDeclarations();
@@ -243,7 +243,7 @@ class ConversionServiceV1Test {
     assertThat(packageNode.getPackageName()).isEqualTo("test");
     assertThat(packageNode.getJavaChunk()).isEqualTo("package test;");
 
-    ClassDeclarationNodeV1 classNode = v1Result.getClassDeclarations().get(0);
+    TypeDeclarationNodeV1 classNode = v1Result.getClassDeclarations().get(0);
     assertThat(classNode).isNotNull();
     assertThat(classNode.getName()).isEqualTo("Test");
   }
@@ -267,7 +267,7 @@ class ConversionServiceV1Test {
     CompilationUnitNodeV1 v1Result =
         conversionService.convert(genericResult, CompilationUnitNodeV1.class);
 
-    ClassDeclarationNodeV1 classNode = v1Result.getClassDeclarations().get(0);
+    TypeDeclarationNodeV1 classNode = v1Result.getClassDeclarations().get(0);
 
     // Then: Validate class-level Javadoc conversion
     assertThat(classNode.getJavadoc()).isNotNull();
@@ -332,7 +332,7 @@ class ConversionServiceV1Test {
     assertThat(v1Result.getClassDeclarations()).isNotEmpty();
 
     // Validate that the conversion preserved the structure
-    ClassDeclarationNodeV1 mainClass = v1Result.getClassDeclarations().get(0);
+    TypeDeclarationNodeV1 mainClass = v1Result.getClassDeclarations().get(0);
     assertThat(mainClass).isNotNull();
     assertThat(mainClass.getChildren()).isNotEmpty(); // Should have inner class or other members
   }

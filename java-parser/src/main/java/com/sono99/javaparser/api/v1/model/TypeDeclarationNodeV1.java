@@ -4,13 +4,13 @@ import com.github.javaparser.ast.body.TypeDeclaration;
 import java.util.List;
 
 /**
- * Represents a V1 class declaration in Java source code. Extends AbstractJavaNodeV1 to provide
- * common AST node functionality and ensure proper inheritance hierarchy. Includes support for
- * Javadoc comments and annotations.
+ * Represents a V1 type declaration in Java source code, encompassing class, interface, and record
+ * declarations. Extends AbstractJavaNodeV1 to provide common AST node functionality and ensure
+ * proper inheritance hierarchy. Includes support for Javadoc comments and annotations.
  *
  * @since v1.0
  */
-public class ClassDeclarationNodeV1 extends AbstractJavaNodeV1<TypeDeclaration<?>> {
+public class TypeDeclarationNodeV1 extends AbstractJavaNodeV1<TypeDeclaration<?>> {
 
   /** The class name. */
   private final String name;
@@ -18,11 +18,8 @@ public class ClassDeclarationNodeV1 extends AbstractJavaNodeV1<TypeDeclaration<?
   /** Associated Javadoc comment. */
   private final JavadocNodeV1 javadoc;
 
-  /** Associated annotations. */
-  private final List<AnnotationNodeV1> annotations;
-
   /**
-   * Constructor for ClassDeclarationNodeV1.
+   * Constructor for TypeDeclarationNodeV1.
    *
    * @param startLine 1-based line number where this class declaration starts
    * @param endLine 1-based line number where this class declaration ends
@@ -30,22 +27,19 @@ public class ClassDeclarationNodeV1 extends AbstractJavaNodeV1<TypeDeclaration<?
    * @param javaCodeChunk the class declaration body
    * @param originalNode reference to the original JavaParser TypeDeclaration
    * @param javadoc the associated Javadoc comment, can be null
-   * @param annotations the associated annotations, can be null
    * @param children the child nodes (methods, fields, inner classes)
    */
-  public ClassDeclarationNodeV1(
+  public TypeDeclarationNodeV1(
       int startLine,
       int endLine,
       String name,
       String javaCodeChunk,
       TypeDeclaration<?> originalNode,
       JavadocNodeV1 javadoc,
-      List<AnnotationNodeV1> annotations,
       List<AbstractJavaNodeV1<? extends com.github.javaparser.ast.Node>> children) {
     super(startLine, endLine, javaCodeChunk, originalNode, children);
     this.name = name;
     this.javadoc = javadoc;
-    this.annotations = annotations != null ? List.copyOf(annotations) : List.of();
   }
 
   /**
@@ -64,15 +58,6 @@ public class ClassDeclarationNodeV1 extends AbstractJavaNodeV1<TypeDeclaration<?
    */
   public JavadocNodeV1 getJavadoc() {
     return javadoc;
-  }
-
-  /**
-   * Gets the associated annotations.
-   *
-   * @return list of annotation nodes, may be empty
-   */
-  public List<AnnotationNodeV1> getAnnotations() {
-    return annotations;
   }
 
   /**

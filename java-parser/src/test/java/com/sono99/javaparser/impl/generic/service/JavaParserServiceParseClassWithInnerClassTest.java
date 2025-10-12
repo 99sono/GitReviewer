@@ -2,10 +2,10 @@ package com.sono99.javaparser.impl.generic.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.sono99.javaparser.impl.generic.model.ClassDeclarationNode;
 import com.sono99.javaparser.impl.generic.model.CompilationUnitNode;
 import com.sono99.javaparser.impl.generic.model.FieldDeclarationNode;
 import com.sono99.javaparser.impl.generic.model.MethodDeclarationNode;
+import com.sono99.javaparser.impl.generic.model.TypeDeclarationNode;
 import java.io.IOException;
 import org.junit.jupiter.api.Test;
 
@@ -14,7 +14,7 @@ import org.junit.jupiter.api.Test;
  * handles inner classes and builds proper hierarchical AST. Tests the core improvement over the
  * original flat approach for nested class scenarios.
  */
-class ParseClassWithInnerClassTest extends AbstractJavaParserTest {
+class JavaParserServiceParseClassWithInnerClassTest extends AbstractJavaParserTest {
 
   /**
    * Test that the JavaParserService correctly parses nested class structures. Validates that inner
@@ -33,10 +33,10 @@ class ParseClassWithInnerClassTest extends AbstractJavaParserTest {
     assertThat(result.getChildren()).hasSize(1); // Only 1 class (no package/import)
 
     // Validate the outer class declaration
-    ClassDeclarationNode outerClass =
+    TypeDeclarationNode outerClass =
         result.getChildren().stream()
-            .filter(ClassDeclarationNode.class::isInstance)
-            .map(ClassDeclarationNode.class::cast)
+            .filter(TypeDeclarationNode.class::isInstance)
+            .map(TypeDeclarationNode.class::cast)
             .findFirst()
             .orElse(null);
 
@@ -78,16 +78,17 @@ class ParseClassWithInnerClassTest extends AbstractJavaParserTest {
     assertThat(outerMethod.getParent()).isSameAs(outerClass);
 
     // Validate inner class is properly nested
-    ClassDeclarationNode innerClass =
+    TypeDeclarationNode innerClass =
         outerClass.getChildren().stream()
-            .filter(ClassDeclarationNode.class::isInstance)
-            .map(ClassDeclarationNode.class::cast)
+            .filter(TypeDeclarationNode.class::isInstance)
+            .map(TypeDeclarationNode.class::cast)
             .filter(c -> "InnerClass".equals(c.getName()))
             .findFirst()
             .orElse(null);
     assertThat(innerClass).isNotNull();
     assertThat(innerClass.getName()).isEqualTo("InnerClass");
-    assertThat(innerClass.getParent()).isSameAs(outerClass); // Inner class parent is outer class
+    assertThat(innerClass.getParent()).isSameAs(outerClass); // Inner class parent is outer
+    // class
 
     // Validate inner class has its own children: field + method
     assertThat(innerClass.getChildren()).hasSize(2);
@@ -132,17 +133,17 @@ class ParseClassWithInnerClassTest extends AbstractJavaParserTest {
 
     // Then: CompilationUnit should have only 1 direct child (the outer class)
     assertThat(result.getChildren()).hasSize(1);
-    ClassDeclarationNode outerClass = (ClassDeclarationNode) result.getChildren().get(0);
+    TypeDeclarationNode outerClass = (TypeDeclarationNode) result.getChildren().get(0);
     assertThat(outerClass.getName()).isEqualTo("ClassWithInnerClass");
 
     // The outer class should have 3 children: field + method + inner class
     assertThat(outerClass.getChildren()).hasSize(3);
 
     // The inner class should be one of the children of the outer class
-    ClassDeclarationNode innerClass =
+    TypeDeclarationNode innerClass =
         outerClass.getChildren().stream()
-            .filter(ClassDeclarationNode.class::isInstance)
-            .map(ClassDeclarationNode.class::cast)
+            .filter(TypeDeclarationNode.class::isInstance)
+            .map(TypeDeclarationNode.class::cast)
             .filter(c -> "InnerClass".equals(c.getName()))
             .findFirst()
             .orElse(null);
@@ -173,7 +174,7 @@ class ParseClassWithInnerClassTest extends AbstractJavaParserTest {
     CompilationUnitNode result = parseFile("ClassWithInnerClass.java", repositoryPath);
 
     // Then: Validate that Javadoc comments are preserved in java chunks
-    ClassDeclarationNode outerClass = (ClassDeclarationNode) result.getChildren().get(0);
+    TypeDeclarationNode outerClass = (TypeDeclarationNode) result.getChildren().get(0);
 
     // Outer class javaChunk contains the class declaration (Javadoc is preserved in
     // source but not in class chunk)
@@ -206,10 +207,10 @@ class ParseClassWithInnerClassTest extends AbstractJavaParserTest {
 
     // Inner class - javaChunk contains just the class declaration (Javadoc is
     // preserved in source)
-    ClassDeclarationNode innerClass =
+    TypeDeclarationNode innerClass =
         outerClass.getChildren().stream()
-            .filter(ClassDeclarationNode.class::isInstance)
-            .map(ClassDeclarationNode.class::cast)
+            .filter(TypeDeclarationNode.class::isInstance)
+            .map(TypeDeclarationNode.class::cast)
             .filter(c -> "InnerClass".equals(c.getName()))
             .findFirst()
             .orElse(null);

@@ -1,60 +1,13 @@
-# impl/generic/utils: Text Processing Utilities
+# impl/generic/utils: Utility Classes for Internal Generic Implementation
 
 ## Purpose
-This package provides reusable utility services for text processing operations, particularly focused on Java source code manipulation. These utilities keep core parsing logic clean by extracting common text operations into proper Spring-managed services.
+This package provides utility classes and helper functions that support the internal generic implementation of the `java-parser` module. These utilities are designed to be reusable within the `impl/generic` package and are not exposed to external API consumers. They assist in tasks such as AST traversal, data manipulation, or other common operations required by the generic services.
 
-## Key Services
+## Key Characteristics
+- **Internal Use Only**: These utilities are strictly for internal use within the `impl/generic` package.
+- **Version-Agnostic**: Independent of any specific API version, contributing to the blackbox nature of the generic implementation.
+- **Helper Functions**: Contains common, non-core logic that aids the main service implementations.
+- **No External Dependencies**: Ideally, these utilities should have minimal dependencies, primarily relying on Java standard library features or other generic internal components.
 
-### SourceContentUtils
-Core utility service for line-based source code operations:
-
-- **Content Extraction**: `extractSourceRange()` - Extract precise text content between line ranges
-- **Line Operations**: `getLine()`, `countLines()` - Individual line access and counting
-- **Validation**: `validateLineRange()` - Parameter validation for safe operations
-- **Normalization**: Handles various line terminator conventions (LF, CRLF, CR)
-
-## Design Principles
-
-### Spring Integration
-- All utilities are `@Service` annotated for proper dependency injection
-- Fully testable with mocking capabilities
-- Spring context management for lifecycle and configuration
-
-### Separation of Concerns
-- Text manipulation separated from parsing logic
-- Single responsibility per utility method
-- Validation and processing clearly separated
-
-### Performance Considerations
-- Minimal memory allocation in hot paths
-- No unnecessary object creation
-- Efficient string operations
-
-## Usage in Parsing
-
-```java
-@Service
-public class JavaParserService {
-
-    @Autowired
-    private SourceContentUtils sourceUtils;
-
-    protected PackageDeclarationNode createPackageDeclarationNode(CompilationUnit cu, String fullSource) {
-        // Clean extraction without cluttering parsing logic
-        String packageChunk = sourceUtils.extractSourceRange(fullSource, range.begin.line, range.end.line);
-        // ... use extracted content
-    }
-}
-```
-
-## Future Extensions
-
-This package can be extended with:
-- Content formatting and indentation handling
-- Syntax-aware text manipulation
-- Performance-optimized caching layers
-- Validation utilities for AST consistency
-
-## Dependencies
-- Standard Java libraries only
-- No external dependencies for maximum reusability
+## Usage
+These utility classes are invoked by services and other components within the `impl/generic` package to perform common, supportive tasks. They help keep the core service logic clean and focused.

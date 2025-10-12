@@ -3,12 +3,13 @@ package com.sono99.javaparser.impl.generic.service;
 import static org.assertj.core.api.Assertions.assertThat;
 
 import com.github.javaparser.ast.CompilationUnit;
-import com.sono99.javaparser.impl.generic.model.ClassDeclarationNode;
+import com.sono99.javaparser.impl.generic.model.AnnotationNode;
 import com.sono99.javaparser.impl.generic.model.CompilationUnitNode;
 import com.sono99.javaparser.impl.generic.model.FieldDeclarationNode;
 import com.sono99.javaparser.impl.generic.model.ImportDeclarationNode;
 import com.sono99.javaparser.impl.generic.model.MethodDeclarationNode;
 import com.sono99.javaparser.impl.generic.model.PackageDeclarationNode;
+import com.sono99.javaparser.impl.generic.model.TypeDeclarationNode;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -89,10 +90,10 @@ abstract class AbstractParseAnimalTest {
         .isTrue();
 
     // Validate the class declaration
-    ClassDeclarationNode classNode =
+    TypeDeclarationNode classNode =
         result.getChildren().stream()
-            .filter(ClassDeclarationNode.class::isInstance)
-            .map(ClassDeclarationNode.class::cast)
+            .filter(TypeDeclarationNode.class::isInstance)
+            .map(TypeDeclarationNode.class::cast)
             .findFirst()
             .orElse(null);
 
@@ -115,7 +116,8 @@ abstract class AbstractParseAnimalTest {
     assertThat(classNode.getJavaChunk())
         .contains("@Entity") // Class annotation
         .contains("@Table(name = \"animals\")") // Table annotation
-        .contains("@Inheritance(strategy = InheritanceType.SINGLE_TABLE)") // Inheritance annotation
+        .contains("@Inheritance(strategy = InheritanceType.SINGLE_TABLE)") // Inheritance
+        // annotation
         .contains("public class Animal") // Class declaration
         .contains("private long id;") // Field
         .contains("private String animalTypeName;") // Another field
@@ -123,12 +125,45 @@ abstract class AbstractParseAnimalTest {
         .contains("public boolean isAnimalTypeValid()") // Method declaration
         .endsWith("}"); // Class closing brace
 
-    // Current implementation: annotations in javaChunk but not parsed to AnnotationNode yet
-    assertThat(classNode.getAnnotations()).isEmpty(); // No structured annotations yet
+    // Validate class-level annotations
+    List<AnnotationNode> classAnnotations =
+        classNode.getChildren().stream()
+            .filter(AnnotationNode.class::isInstance)
+            .map(AnnotationNode.class::cast)
+            .toList();
+    assertThat(classAnnotations).hasSize(3);
+    assertThat(
+            classAnnotations.stream()
+                .anyMatch(
+                    ann -> ann.getName().equals("Entity") && ann.getJavaChunk().equals("@Entity")))
+        .isTrue();
+    assertThat(
+            classAnnotations.stream()
+                .anyMatch(
+                    ann -> {
+                      if (ann.getName().equals("Table")) {
+                        System.out.println("DEBUG: @Table javaCodeChunk = " + ann.getJavaChunk());
+                      }
+                      String expectedAnnoationCode = "@Table(name = \"animals\")";
+                      return ann.getName().equals("Table")
+                          && ann.getJavaChunk().equals(expectedAnnoationCode);
+                    }))
+        .isTrue();
+    assertThat(
+            classAnnotations.stream()
+                .anyMatch(
+                    ann ->
+                        ann.getName().equals("Inheritance")
+                            && ann.getJavaChunk()
+                                .equals("@Inheritance(strategy = InheritanceType.SINGLE_TABLE)")))
+        .isTrue();
 
-    // With DFS approach, fields and methods are correctly children of the class
-    assertThat(classNode.getChildren()).isNotEmpty(); // Now has field and method children
-    assertThat(classNode.getChildren()).hasSize(6); // 2 fields + 4 methods
+    // Current implementation: annotations in javaChunk but not parsed to AnnotationNode yet
+
+    // With DFS approach, fields, methods, and annotations are correctly children of the class
+    assertThat(classNode.getChildren())
+        .isNotEmpty(); // Now has field, method, and annotation children
+    assertThat(classNode.getChildren()).hasSize(9); // 3 class annotations + 2 fields + 4 methods
 
     // Validate that we have the expected field and method children
     long fieldCount =
@@ -160,6 +195,18 @@ abstract class AbstractParseAnimalTest {
     assertThat(idField.getType()).isEqualTo("long");
     assertThat(idField.getJavaChunk()).contains("@Id");
     assertThat(idField.getJavaChunk()).contains("private long id;");
+
+    // Validate field-level annotations for idField
+    List<AnnotationNode> fieldAnnotations =
+        idField.getChildren().stream()
+            .filter(AnnotationNode.class::isInstance)
+            .map(AnnotationNode.class::cast)
+            .toList();
+    assertThat(fieldAnnotations).hasSize(1); // Field should have @Id annotation as child
+    assertThat(
+            fieldAnnotations.stream()
+                .anyMatch(ann -> ann.getName().equals("Id") && ann.getJavaChunk().contains("@Id")))
+        .isTrue();
 
     // Validate field-level Javadoc extraction for id field
     assertThat(idField.getJavadoc()).isNotNull();
@@ -201,6 +248,21 @@ abstract class AbstractParseAnimalTest {
     assertThat(validationMethod.getSignature()).isEqualTo("isAnimalTypeValid()");
     assertThat(validationMethod.getJavaChunk()).contains("@AssertTrue");
     assertThat(validationMethod.getJavaChunk()).contains("public boolean isAnimalTypeValid()");
+
+    // Validate method-level annotations for validationMethod
+    List<AnnotationNode> methodAnnotations =
+        validationMethod.getChildren().stream()
+            .filter(AnnotationNode.class::isInstance)
+            .map(AnnotationNode.class::cast)
+            .toList();
+    assertThat(methodAnnotations).hasSize(1);
+    assertThat(
+            methodAnnotations.stream()
+                .anyMatch(
+                    ann ->
+                        ann.getName().equals("AssertTrue")
+                            && ann.getJavaChunk().contains("@AssertTrue")))
+        .isTrue();
 
     // Validate method-level Javadoc extraction for isAnimalTypeValid method
     assertThat(validationMethod.getJavadoc()).isNotNull();
@@ -258,7 +320,7 @@ abstract class AbstractParseAnimalTest {
     }
 
     // Verify class declaration node has access to original TypeDeclaration
-    ClassDeclarationNode classNode = result.getClassDeclarations().get(0);
+    TypeDeclarationNode classNode = result.getTypeDeclarations().get(0);
     assertThat(classNode).isNotNull();
     assertThat(classNode.getOriginalNode()).isNotNull();
     assertThat(classNode.getOriginalNode())
@@ -290,10 +352,10 @@ abstract class AbstractParseAnimalTest {
     // Given: Minimal valid Java source
     String minimalJava =
         """
-            package test;
-            public class Test {
-            }
-            """;
+                package test;
+                public class Test {
+                }
+                """;
     String repositoryPath = "src/test/java/test/Test.java";
     JavaParserService parserService = createParserService();
 
@@ -317,7 +379,7 @@ abstract class AbstractParseAnimalTest {
     assertThat(packageNode.getPackageName()).isEqualTo("test");
     assertThat(packageNode.getJavaChunk()).isEqualTo("package test;");
 
-    ClassDeclarationNode classNode = result.getClassDeclarations().get(0);
+    TypeDeclarationNode classNode = result.getTypeDeclarations().get(0);
     assertThat(classNode).isNotNull();
     assertThat(classNode.getName()).isEqualTo("Test");
   }
@@ -342,7 +404,7 @@ abstract class AbstractParseAnimalTest {
     CompilationUnitNode result =
         parserService.parseCompilationUnit(
             new ByteArrayInputStream(sourceContent.getBytes()), repositoryPath);
-    ClassDeclarationNode classNode = result.getClassDeclarations().get(0);
+    TypeDeclarationNode classNode = result.getTypeDeclarations().get(0);
 
     // Then: Validate class-level Javadoc extraction
     assertThat(classNode.getJavadoc()).isNotNull();

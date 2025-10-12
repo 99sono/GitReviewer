@@ -99,7 +99,7 @@ public abstract class AbstractJavaNode<T extends Node> {
    *
    * @return parent node, or null for root nodes
    */
-  public AbstractJavaNode getParent() {
+  public AbstractJavaNode<? extends Node> getParent() {
     return parent;
   }
 

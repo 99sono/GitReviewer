@@ -2,12 +2,14 @@ package com.sono99.javaparser.impl.generic.service;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
-import com.sono99.javaparser.impl.generic.model.ClassDeclarationNode;
+import com.sono99.javaparser.impl.generic.model.AnnotationNode;
 import com.sono99.javaparser.impl.generic.model.CompilationUnitNode;
+import com.sono99.javaparser.impl.generic.model.TypeDeclarationNode;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.List;
 import org.junit.jupiter.api.Test;
 
 /**
@@ -16,7 +18,7 @@ import org.junit.jupiter.api.Test;
  * generalization of parsing logic. Tests a simpler service class with basic annotations and imports
  * to verify no hard-coded assumptions exist.
  */
-class ParseDummyTestServiceTest extends AbstractJavaParserTest {
+class JavaParserServiceParseDummyTestServiceTest extends AbstractJavaParserTest {
 
   /**
    * Test that the JavaParserService correctly parses the DummyTestService Java source file and
@@ -51,10 +53,10 @@ class ParseDummyTestServiceTest extends AbstractJavaParserTest {
     assertThat(result.getChildren()).hasSize(4); // 1 package + 2 imports + 1 class
 
     // Validate the class declaration
-    ClassDeclarationNode classNode =
+    TypeDeclarationNode classNode =
         result.getChildren().stream()
-            .filter(ClassDeclarationNode.class::isInstance)
-            .map(ClassDeclarationNode.class::cast)
+            .filter(TypeDeclarationNode.class::isInstance)
+            .map(TypeDeclarationNode.class::cast)
             .findFirst()
             .orElse(null);
 
@@ -75,13 +77,27 @@ class ParseDummyTestServiceTest extends AbstractJavaParserTest {
         .contains("public boolean validateConfig()") // Another method
         .endsWith("}"); // Class closing brace
 
+    // Validate class-level annotations
+    List<AnnotationNode> classAnnotations =
+        classNode.getChildren().stream()
+            .filter(AnnotationNode.class::isInstance)
+            .map(AnnotationNode.class::cast)
+            .toList();
+    assertThat(classAnnotations).hasSize(1);
+    assertThat(
+            classAnnotations.stream()
+                .anyMatch(
+                    ann ->
+                        ann.getName().equals("Service") && ann.getJavaChunk().equals("@Service")))
+        .isTrue();
+
     // Current implementation: annotations in javaChunk but not parsed to
     // AnnotationNode yet (Step A)
-    assertThat(classNode.getAnnotations()).isEmpty(); // Step A - no structured annotations yet
 
-    // With DFS approach, methods are correctly children of the class
-    assertThat(classNode.getChildren()).isNotEmpty(); // Now has method children
-    assertThat(classNode.getChildren()).hasSize(2); // 2 methods in DummyTestService
+    // With DFS approach, methods and annotations are correctly children of the class
+    assertThat(classNode.getChildren()).isNotEmpty(); // Now has method and annotation children
+    assertThat(classNode.getChildren())
+        .hasSize(3); // 1 class annotation + 2 methods in DummyTestService
 
     // Validate that we have the expected method children
     long methodCount =

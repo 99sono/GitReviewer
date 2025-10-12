@@ -18,7 +18,7 @@ import org.springframework.test.context.ContextConfiguration;
  */
 @SpringBootTest
 @ContextConfiguration(classes = {JavaParserService.class, SourceContentUtils.class})
-class ParseAnimalIntegrationTest extends AbstractParseAnimalTest {
+class JavaParserServiceParseAnimalIntegrationTest extends AbstractParseAnimalTest {
 
   @Autowired private JavaParserService parserService;
 

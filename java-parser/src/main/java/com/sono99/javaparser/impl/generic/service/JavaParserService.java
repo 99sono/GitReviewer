@@ -1,5 +1,7 @@
 package com.sono99.javaparser.impl.generic.service;
 
+import static com.github.javaparser.ParserConfiguration.LanguageLevel.JAVA_21;
+
 import com.github.javaparser.Range;
 import com.github.javaparser.StaticJavaParser;
 import com.github.javaparser.ast.CompilationUnit;
@@ -9,15 +11,16 @@ import com.github.javaparser.ast.PackageDeclaration;
 import com.github.javaparser.ast.body.FieldDeclaration;
 import com.github.javaparser.ast.body.MethodDeclaration;
 import com.github.javaparser.ast.body.TypeDeclaration;
+import com.github.javaparser.ast.expr.AnnotationExpr;
 import com.sono99.javaparser.impl.generic.model.AbstractJavaNode;
 import com.sono99.javaparser.impl.generic.model.AnnotationNode;
-import com.sono99.javaparser.impl.generic.model.ClassDeclarationNode;
 import com.sono99.javaparser.impl.generic.model.CompilationUnitNode;
 import com.sono99.javaparser.impl.generic.model.FieldDeclarationNode;
 import com.sono99.javaparser.impl.generic.model.ImportDeclarationNode;
 import com.sono99.javaparser.impl.generic.model.JavadocNode;
 import com.sono99.javaparser.impl.generic.model.MethodDeclarationNode;
 import com.sono99.javaparser.impl.generic.model.PackageDeclarationNode;
+import com.sono99.javaparser.impl.generic.model.TypeDeclarationNode;
 import com.sono99.javaparser.impl.generic.utils.SourceContentHelper;
 import com.sono99.javaparser.impl.generic.utils.SourceContentUtils;
 import java.io.IOException;
@@ -66,7 +69,10 @@ public class JavaParserService {
       // (a) Read full source content first
       String javaCodeChunk = readSourceAsString(source);
 
-      // (b) Parse source to GitHub parser CompilationUnit and return immediately
+      StaticJavaParser.getParserConfiguration()
+          .setLanguageLevel(com.github.javaparser.ParserConfiguration.LanguageLevel.JAVA_21);
+
+      // (c) Parse source to GitHub parser CompilationUnit and return immediately
       CompilationUnit gitHubParserCompilationUnitNode = StaticJavaParser.parse(javaCodeChunk);
 
       return gitHubParserCompilationUnitNode;
@@ -110,7 +116,10 @@ public class JavaParserService {
       // (b) Create SourceContentHelper for efficient text operations
       SourceContentHelper contentHelper = sourceUtils.createHelper(javaCodeChunk);
 
-      // (c) Parse source to JavaParser CompilationUnit
+      // (c) Configure JavaParser to use JAVA_21 language level
+      StaticJavaParser.getParserConfiguration().setLanguageLevel(JAVA_21);
+
+      // (d) Parse source to JavaParser CompilationUnit
       CompilationUnit gitHubParserCompilationUnitNode = StaticJavaParser.parse(javaCodeChunk);
 
       // (d) Extract basic information for root node
@@ -203,14 +212,19 @@ public class JavaParserService {
       return createImportDeclarationNode(imp, helper);
     }
 
-    // Handle TypeDeclaration (classes, interfaces, enums)
+    // Handle AnnotationExpr
+    if (gitHubNode instanceof AnnotationExpr annotationExpr) {
+      return createAnnotationNode(annotationExpr, helper);
+    }
+
+    // Handle TypeDeclaration (classes, interfaces, enums, records)
     if (gitHubNode instanceof TypeDeclaration<?> typeDecl) {
       return createTypeDeclarationNode(typeDecl, children, helper);
     }
 
     // Handle FieldDeclaration
     if (gitHubNode instanceof FieldDeclaration field) {
-      return createFieldDeclarationNode(field, helper);
+      return createFieldDeclarationNode(field, children, helper);
     }
 
     // Handle MethodDeclaration
@@ -324,8 +338,8 @@ public class JavaParserService {
         );
   }
 
-  /** Creates ClassDeclarationNode from GitHub TypeDeclaration. */
-  private ClassDeclarationNode createTypeDeclarationNode(
+  /** Creates TypeDeclarationNode from GitHub TypeDeclaration. */
+  private TypeDeclarationNode createTypeDeclarationNode(
       TypeDeclaration<?> typeDecl,
       List<AbstractJavaNode<? extends Node>> children,
       SourceContentHelper helper) {
@@ -337,24 +351,18 @@ public class JavaParserService {
 
     String classChunk = sourceUtils.extractSourceRange(helper, range.begin.line, range.end.line);
 
-    // Extract Javadoc and annotations if present
+    // Extract Javadoc if present
     JavadocNode javadoc = createJavadocNodeForType(typeDecl, helper);
-    List<AnnotationNode> annotations = List.of();
 
-    return new ClassDeclarationNode(
-        range.begin.line,
-        range.end.line,
-        name,
-        classChunk,
-        typeDecl,
-        javadoc,
-        annotations,
-        children);
+    return new TypeDeclarationNode(
+        range.begin.line, range.end.line, name, classChunk, typeDecl, javadoc, children);
   }
 
   /** Creates FieldDeclarationNode from GitHub FieldDeclaration. */
   private FieldDeclarationNode createFieldDeclarationNode(
-      FieldDeclaration field, SourceContentHelper helper) {
+      FieldDeclaration field,
+      List<AbstractJavaNode<? extends Node>> children,
+      SourceContentHelper helper) {
     Range range = field.getRange().orElse(null);
     if (range == null) {
       return null;
@@ -368,7 +376,6 @@ public class JavaParserService {
 
     // Extract Javadoc for field
     JavadocNode javadoc = createJavadocNodeForField(field, helper);
-    List<AnnotationNode> annotations = List.of();
 
     return new FieldDeclarationNode(
         range.begin.line,
@@ -378,8 +385,7 @@ public class JavaParserService {
         fieldChunk,
         field,
         javadoc,
-        annotations,
-        List.of() // fields have no children
+        children // field annotations and other children
         );
   }
 
@@ -400,7 +406,6 @@ public class JavaParserService {
 
     // Extract Javadoc for method
     JavadocNode javadoc = createJavadocNodeForMethod(method, helper);
-    List<AnnotationNode> annotations = List.of();
 
     return new MethodDeclarationNode(
         range.begin.line,
@@ -410,8 +415,28 @@ public class JavaParserService {
         methodChunk,
         method,
         javadoc,
-        annotations,
         children // method body contents
+        );
+  }
+
+  /** Creates AnnotationNode from GitHub AnnotationExpr. */
+  private AnnotationNode createAnnotationNode(
+      AnnotationExpr annotationExpr, SourceContentHelper helper) {
+    var range = annotationExpr.getRange().orElse(null);
+    if (range == null) {
+      return null;
+    }
+
+    String annotationText =
+        sourceUtils.extractSourceRange(helper, range.begin.line, range.end.line);
+
+    return new AnnotationNode(
+        range.begin.line,
+        range.end.line,
+        annotationExpr.getNameAsString(),
+        annotationText,
+        annotationExpr,
+        List.of() // annotations have no children
         );
   }
 

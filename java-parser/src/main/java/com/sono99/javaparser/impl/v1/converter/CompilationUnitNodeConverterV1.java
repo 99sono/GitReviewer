@@ -24,8 +24,7 @@ public class CompilationUnitNodeConverterV1
         (List<AbstractJavaNodeV1<?>>)
             (List<?>)
                 source.getChildren().stream()
-                    .map(child -> conversionService.convert(child, Object.class))
-                    .map(AbstractJavaNodeV1.class::cast)
+                    .map(child -> conversionService.convert(child, AbstractJavaNodeV1.class))
                     .collect(Collectors.toList());
     return new CompilationUnitNodeV1(
         source.getStartLine(),

@@ -1,16 +1,18 @@
 package com.sono99.javaparser.impl.generic.model;
 
+import com.github.javaparser.ast.Node;
 import com.github.javaparser.ast.body.TypeDeclaration;
 import java.util.List;
 
 /**
- * Represents a class declaration in Java source code (e.g., "public class Animal { ... }").
- * Includes support for Javadoc comments and annotations. Maintains a reference to the original
- * JavaParser TypeDeclaration for enhanced information access.
+ * Represents a type declaration in Java source code, encompassing class, interface, and record
+ * declarations. (e.g., "public class Animal { ... }", "public interface MyInterface { ... }",
+ * "public record MyRecord(...) { ... }"). Includes support for Javadoc comments and annotations.
+ * Maintains a reference to the original JavaParser TypeDeclaration for enhanced information access.
  *
  * @since v1.0
  */
-public class ClassDeclarationNode extends AbstractJavaElementNode<TypeDeclaration<?>> {
+public class TypeDeclarationNode extends AbstractJavaElementNode<TypeDeclaration<?>> {
 
   /** The class name. */
   private final String name;
@@ -19,38 +21,27 @@ public class ClassDeclarationNode extends AbstractJavaElementNode<TypeDeclaratio
   private final JavadocNode javadoc;
 
   /**
-   * Associated annotations. FIXME: POTENTIALLY UNNECESSARY - JavaParser's getRange() for class
-   * declarations already includes annotations in the javaCodeChunk. Consider eliminating this field
-   * if structured annotation parsing proves unnecessary for LLM code review use cases. Observed
-   * with Animal.java: getRange() correctly captures @Entity, @Table, etc.
-   */
-  private final List<AnnotationNode> annotations;
-
-  /**
-   * Constructor for ClassDeclarationNode.
+   * Constructor for TypeDeclarationNode.
    *
    * @param startLine 1-based line number where this class declaration starts
    * @param endLine 1-based line number where this class declaration ends
    * @param name the class name
    * @param javaCodeChunk the class declaration body
-   * @param originalNode reference to the original JavaParser TypeDeclaration
+   * @param originalNode reference to the original github JavaParser TypeDeclaration
    * @param javadoc the associated Javadoc comment, can be null
-   * @param annotations the associated annotations, can be null
    * @param children the child nodes (methods, fields, inner classes)
    */
-  public ClassDeclarationNode(
+  public TypeDeclarationNode(
       int startLine,
       int endLine,
       String name,
       String javaCodeChunk,
-      TypeDeclaration originalNode,
+      TypeDeclaration<?> originalNode,
       JavadocNode javadoc,
-      List<AnnotationNode> annotations,
-      List<AbstractJavaNode<? extends com.github.javaparser.ast.Node>> children) {
+      List<AbstractJavaNode<? extends Node>> children) {
     super(startLine, endLine, javaCodeChunk, originalNode, children);
     this.name = name;
     this.javadoc = javadoc;
-    this.annotations = annotations != null ? annotations : List.of();
   }
 
   /**
@@ -72,15 +63,6 @@ public class ClassDeclarationNode extends AbstractJavaElementNode<TypeDeclaratio
   }
 
   /**
-   * Gets the associated annotations.
-   *
-   * @return list of annotation nodes, may be empty
-   */
-  public List<AnnotationNode> getAnnotations() {
-    return annotations;
-  }
-
-  /**
    * Gets the source code chunk including Javadoc and annotations.
    *
    * @return the enriched class declaration with metadata
@@ -95,6 +77,11 @@ public class ClassDeclarationNode extends AbstractJavaElementNode<TypeDeclaratio
     }
 
     // Add annotations if present
+    List<AnnotationNode> annotations =
+        getChildren().stream()
+            .filter(AnnotationNode.class::isInstance)
+            .map(AnnotationNode.class::cast)
+            .toList();
     if (!annotations.isEmpty()) {
       for (AnnotationNode annotation : annotations) {
         enriched.append(annotation.getJavaChunk()).append("\n");

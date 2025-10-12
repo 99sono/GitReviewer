@@ -1,22 +1,13 @@
-# api/v1/model: Public v1 Model DTOs
+# api/v1/model: Public v1 API Data Transfer Objects (DTOs)
 
 ## Purpose
-This sub-package contains versioned data transfer objects (DTOs) for the v1 API, representing parsed Java AST structures without exposing internal implementation details from impl/generic. These DTOs provide a stable, sanitized view for consumers (e.g., rule-engine analyzing nodes, github-connector storing metadata). They form the output of `JavaParsingServiceV1.parse`, enabling integration while maintaining black-box separation. Part of sono99:java-parser-api-v1 artifact.
+This package contains the Data Transfer Objects (DTOs) that define the public, stable v1 data contract for the `java-parser` module. These DTOs are used by external consumers to interact with the `java-parser` API, ensuring a consistent and versioned data structure. This includes DTOs representing various Java type declarations such as classes, interfaces, and records. They mirror the internal canonical models but are sanitized to hide implementation details and ensure API stability.
 
-## Key Classes (Planned/Placeholder)
-- `EnrichedContentV1`: Versioned container for root node, quick links, and metadata (mirrors impl/generic/model/EnrichedContent but omits backend refs).
-- `JavaParsingNodeV1`: Hierarchical AST node with positions, name, signature, children (mirrors impl/generic/model/JavaParsingNode; hides originalId/backend for security).
-- Other DTOs (e.g., `AnnotationRefV1`, `JavadocRefV1`, `QuickLinkV1`, `ModifierV1`): Mirror internal models with necessary sanitization.
-- Currently: `package.info` as placeholder; implement DTOs (as records for immutability) when fixing V1 interface deps.
+## Key Characteristics
+- **Public Contract**: These DTOs are part of the public API and should be treated as immutable once exposed.
+- **Versioned**: Specific to v1 of the API. Breaking changes would necessitate a new version (e.g., v2).
+- **Sanitized**: Internal implementation details (e.g., backend references) are removed or abstracted to prevent leakage and maintain API stability.
+- **Immutability**: Follows the project's `.clinerules` by preferring records or immutable classes for data representation.
 
-## Dependencies
-- None on impl, generic, or external libs beyond Java stdlib.
-- No JavaParser-specific types exposed—use simple types (String, List, Optional) for portability.
-
-## Versioning Notes
-- v1: Basic positions, node kinds (NoteTypeV1 enum?), enrichment refs. DTOs are immutable records, matching .clinerules.
-- Conversions: Handled in impl/v1 mappers (generic `EnrichedContent` → `EnrichedContentV1`, flattening/hiding internals).
-- Enforcement: No impl deps; tests validate round-trip compatibility (v1 DTO → generic → v1 DTO).
-- Future v2: Add AI-enriched fields (e.g., semantic scores) without breaking v1.
-
-These DTOs ensure API reliability—internal model changes (e.g., new fields in generic) are adapted in bridges.
+## Usage
+Consumers of the `java-parser` API will receive and send data using these DTOs. Converters in the `impl/v1/converter` package are responsible for translating between these public DTOs and the internal generic models.

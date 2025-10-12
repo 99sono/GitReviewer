@@ -21,9 +21,6 @@ public class MethodDeclarationNodeV1 extends AbstractJavaNodeV1<MethodDeclaratio
   /** Associated Javadoc comment. */
   private final JavadocNodeV1 javadoc;
 
-  /** Associated annotations. */
-  private final List<AnnotationNodeV1> annotations;
-
   /**
    * Constructor for MethodDeclarationNodeV1.
    *
@@ -34,7 +31,6 @@ public class MethodDeclarationNodeV1 extends AbstractJavaNodeV1<MethodDeclaratio
    * @param javaCodeChunk the method implementation
    * @param originalNode reference to the original JavaParser MethodDeclaration
    * @param javadoc the associated Javadoc comment, can be null
-   * @param annotations the associated annotations, can be null
    * @param children method body contents
    */
   public MethodDeclarationNodeV1(
@@ -45,13 +41,11 @@ public class MethodDeclarationNodeV1 extends AbstractJavaNodeV1<MethodDeclaratio
       String javaCodeChunk,
       MethodDeclaration originalNode,
       JavadocNodeV1 javadoc,
-      List<AnnotationNodeV1> annotations,
       List<AbstractJavaNodeV1<? extends com.github.javaparser.ast.Node>> children) {
     super(startLine, endLine, javaCodeChunk, originalNode, children);
     this.name = name;
     this.signature = signature;
     this.javadoc = javadoc;
-    this.annotations = annotations != null ? List.copyOf(annotations) : List.of();
   }
 
   /**
@@ -79,14 +73,5 @@ public class MethodDeclarationNodeV1 extends AbstractJavaNodeV1<MethodDeclaratio
    */
   public JavadocNodeV1 getJavadoc() {
     return javadoc;
-  }
-
-  /**
-   * Gets the associated annotations.
-   *
-   * @return list of annotation nodes, may be empty
-   */
-  public List<AnnotationNodeV1> getAnnotations() {
-    return annotations;
   }
 }
