@@ -1,6 +1,9 @@
 # Compiled class file
 *.class
 
+# disable speckit gemini folder
+.gemini
+
 # prompt to not commit
 deleteMePrompt*.md
 
@@ -13,6 +16,10 @@ deleteMePrompt*.md
 
 # Mobile Tools for Java (J2ME)
 .mtj.tmp/
+
+# Patch files should not be committed
+*.patch 
+
 
 # Package Files #
 *.jar
