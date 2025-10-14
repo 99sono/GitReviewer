@@ -1,0 +1,11 @@
+[
+    // Will go over every maven project trying to format the one file that actually matters
+    {
+        "key": "ctrl+shift+i",
+        "command": "workbench.action.terminal.sendSequence",
+        "args": {
+            "text": "mvn spotless:apply -DspotlessFiles=\"${file}\"\n"
+        },
+        "when": "editorLangId == java" // Optional: Only trigger for Java files
+    }
+]

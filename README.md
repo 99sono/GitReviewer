@@ -122,15 +122,6 @@ mvn clean compile
 - [Module Guides](./java-parser/README.md) - Individual module documentation
 - [Development](./metadata/) - Development tracking and summaries
 
-## 🤝 Contributing
-
-This project is designed to be modular and extensible. Contributions are welcome for:
-
-- New analysis rules
-- Additional LLM integrations
-- Enhanced Git hosting platform support
-- Performance optimizations
-- Documentation improvements
 
 ## Java formatting
 
@@ -174,16 +165,27 @@ This project is designed to be modular and extensible. Contributions are welcome
 
 For complete Google Java Style guidelines, see: [Google Java Style Guide](https://google.github.io/styleguide/javaguide.html)
 
+## XML Formatting
+
+The project uses **Spotless** with the **Eclipse WTP XML formatter** (Red Hat's XML plugin) for consistent XML formatting across the entire codebase.
+
+### XML Formatting Features
+
+- **Spotless Plugin**: Configured in `pom.xml` to format all `*.xml` files using Eclipse WTP XML formatter version 4.33
+- **Automatic Formatting**: XML files are automatically formatted when saved through the configured formatter
+- **Comprehensive Coverage**: Formats all XML files in the project, including configuration files like `pom.xml`, `checkstyle.xml`, etc.
+
+### Usage Commands
+
+```bash
+# Format all XML files in the project
+mvn spotless:apply
+
+# Format specific XML files
+mvn spotless:apply -DspotlessFiles="pom.xml,checkstyle.xml"
+```
+
 ## 📄 License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## 🙏 Acknowledgments
-
-- Built on specifications from the `delete_me/` folder
-- Inspired by modern code review automation trends
-- Leverages open-source libraries for robust functionality
-
----
-
-*Initial project skeleton created on 2025-09-10*

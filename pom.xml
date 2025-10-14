@@ -178,30 +178,34 @@
                 </plugin>
                 <!--
                 Format the entire repository with
-                mvn spotless:apply
+                    mvn spotless:apply
+                Format a single file with:
+                    mvn spotless:apply -DspotlessFiles=".*SourceContentHelper.java"
                 -->
                 <plugin>
                     <groupId>com.diffplug.spotless</groupId>
                     <artifactId>spotless-maven-plugin</artifactId>
                     <version>${spotless-maven-plugin.version}</version>
                     <configuration>
-                        <!--java>
-                            <eclipse>
-                                <file>${project.basedir}/../.eclipse-java-google-style.xml</file>
-                            </eclipse>
-                        </java -->
-                        <!-- 
-                            See: https://github.com/google/google-java-format
-                            There is no official google plugin for vs code.
-                            Therefore we make use of the plugin of Marko Milic
-                            https://marketplace.visualstudio.com/items?itemName=mmilic.java-google-format 
-                        -->
                         <java>
                             <googleJavaFormat>
                                 <version>1.23.0</version>
                                 <style>GOOGLE</style>
                             </googleJavaFormat>
                         </java>
+                        <xml>  <!-- New section for XML -->
+                            <eclipseWtp>
+                                <type>XML</type>  <!-- Specifies XML formatter -->
+                                <!-- files>
+                                    <file>${project.basedir}/eclipse-wtp-xml.prefs</file>
+                                </files -->
+                                <version>4.33</version>
+                            </eclipseWtp>
+                            <includes>
+                                <include>**/*.xml</include>  <!-- Targets all XML files; customize as
+                                needed, e.g., exclude pom.xml if using sortpom -->
+                            </includes>
+                        </xml>
                     </configuration>
                     <executions>
                         <execution>
