@@ -13,7 +13,6 @@ import java.util.List;
  * @param isDeleted whether the file is deleted
  * @param isRenamed whether the file is renamed
  * @param oldFilePath the old file path if renamed
- * @param diffStartLineForFile the starting line number for the diff in the file
  * @param diffChunks the list of diff chunks in this file
  * @param originalDiffFile the original java-diff-utils UnifiedDiffFile object for lazy text
  *     extraction
@@ -25,7 +24,6 @@ public record DiffedFile(
     boolean isDeleted,
     boolean isRenamed,
     String oldFilePath,
-    int diffStartLineForFile,
     List<DiffChunk> diffChunks,
     UnifiedDiffFile originalDiffFile) {
   /**

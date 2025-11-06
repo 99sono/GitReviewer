@@ -64,7 +64,7 @@ public record DiffChunk(
    * @return the start line number of the source hunk, or null if no source range
    */
   public Integer getSourceHunkStartLine() {
-    return sourceLineRange != null ? sourceLineRange.startLine() : null;
+    return sourceLineRange != null ? sourceLineRange.startLineIndex() : null;
   }
 
   /**
@@ -73,7 +73,7 @@ public record DiffChunk(
    * @return the end line number of the source hunk, or null if no source range
    */
   public Integer getSourceHunkEndLine() {
-    return sourceLineRange != null ? sourceLineRange.endLine() : null;
+    return sourceLineRange != null ? sourceLineRange.endLineIndex() : null;
   }
 
   /**
@@ -81,8 +81,8 @@ public record DiffChunk(
    *
    * @return the start line number of the target hunk, or null if no target range
    */
-  public Integer getTargetHunkStartLine() {
-    return targetLineRange != null ? targetLineRange.startLine() : null;
+  public Integer getTargetHunkStartLineIndex() {
+    return targetLineRange != null ? targetLineRange.startLineIndex() : null;
   }
 
   /**
@@ -90,25 +90,7 @@ public record DiffChunk(
    *
    * @return the end line number of the target hunk, or null if no target range
    */
-  public Integer getTargetHunkEndLine() {
-    return targetLineRange != null ? targetLineRange.endLine() : null;
-  }
-
-  /**
-   * Legacy method for backward compatibility - gets the hunk start line (source preferred).
-   *
-   * @return the hunk start line, preferring source over target
-   */
-  public int hunkStartLine() {
-    return getSourceHunkStartLine() != null ? getSourceHunkStartLine() : getTargetHunkStartLine();
-  }
-
-  /**
-   * Legacy method for backward compatibility - gets the hunk end line (source preferred).
-   *
-   * @return the hunk end line, preferring source over target
-   */
-  public int hunkEndLine() {
-    return getSourceHunkEndLine() != null ? getSourceHunkEndLine() : getTargetHunkEndLine();
+  public Integer getTargetHunkEndLineIndex() {
+    return targetLineRange != null ? targetLineRange.endLineIndex() : null;
   }
 }

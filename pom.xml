@@ -272,6 +272,37 @@
                         </execution>
                     </executions>
                 </plugin>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-javadoc-plugin</artifactId>
+                    <version>3.6.3</version> <!-- Use a recent stable version -->
+                    <configuration>
+                        <source>21</source>
+                        <detectJavaApiLink>true</detectJavaApiLink>
+                        <detectLinks>true</detectLinks>
+                        <failOnError>false</failOnError>
+                        <doclint>none</doclint>
+                    </configuration>
+                    <executions>
+                        <execution>
+                            <id>attach-javadocs</id>
+                            <goals>
+                                <goal>jar</goal>
+                            </goals>
+                        </execution>
+                        <execution>
+                            <id>generate-test-javadocs</id>
+                            <goals>
+                                <goal>test-javadoc</goal>
+                            </goals>
+                            <configuration>
+                                <show>package</show> <!-- Include package-private members for test Javadoc -->
+                                <doclint>none</doclint>
+                                <failOnError>false</failOnError>
+                            </configuration>
+                        </execution>
+                    </executions>
+                </plugin>
             </plugins>
         </pluginManagement>
 

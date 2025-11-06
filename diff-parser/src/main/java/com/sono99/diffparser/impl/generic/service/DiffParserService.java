@@ -55,12 +55,9 @@ public class DiffParserService {
       // (c) Create top-level result with statistics
       String diffHeader = extractDiffHeader(unifiedDiff);
       int totalFilesChanged = diffedFiles.size();
-      int totalAdditions = calculateTotalAdditions(diffedFiles);
-      int totalDeletions = calculateTotalDeletions(diffedFiles);
 
       TopLevelDiffResult topLevelResult =
-          new TopLevelDiffResult(
-              diffedFiles, diffHeader, totalFilesChanged, totalAdditions, totalDeletions);
+          new TopLevelDiffResult(diffedFiles, diffHeader, totalFilesChanged);
 
       return new ParsedDiff(topLevelResult, diffContent, unifiedDiff, true);
 
@@ -68,7 +65,7 @@ public class DiffParserService {
       // (e) Handle parsing errors gracefully
       LOGGER.warn("Failed to parse unified diff: {}", e.getMessage(), e);
       return new ParsedDiff(
-          new TopLevelDiffResult(List.of(), "", 0, 0, 0), // Empty result
+          new TopLevelDiffResult(List.of(), "", 0), // Empty result
           diffContent,
           null, // No original unified diff file
           false // Mark as invalid
@@ -99,9 +96,6 @@ public class DiffParserService {
     boolean isCreatedNew = unifiedDiffFile.getFromFile().equals("/dev/null");
     boolean isRenamed = !fromFile.equals(toFile) && !isDeleted && !isCreatedNew;
 
-    // (d) Calculate diff start line (first hunk start)
-    int diffStartLineForFile = diffChunks.isEmpty() ? 1 : diffChunks.get(0).hunkStartLine();
-
     return new DiffedFile(
         repositoryPath,
         toFile,
@@ -109,7 +103,6 @@ public class DiffParserService {
         isDeleted,
         isRenamed,
         fromFile,
-        diffStartLineForFile,
         diffChunks,
         unifiedDiffFile // Preserve original for lazy text extraction
         );
@@ -132,7 +125,8 @@ public class DiffParserService {
     // (c) Create source line range (direct 1:1 mapping)
     LineRange sourceLineRange = null;
     if (sourceChunk.size() > 0) {
-      sourceLineRange = new LineRange(sourceChunk.getPosition(), sourceChunk.last(), changeType);
+      sourceLineRange =
+          new LineRange(sourceChunk.getPosition(), sourceChunk.last(), sourceChunk, changeType);
     }
 
     // (d) Create target line range (direct 1:1 mapping)
@@ -141,7 +135,8 @@ public class DiffParserService {
       LineRange.ChangeType targetChangeType =
           changeType == LineRange.ChangeType.DELETE ? LineRange.ChangeType.INSERT : changeType;
       targetLineRange =
-          new LineRange(targetChunk.getPosition(), targetChunk.last(), targetChangeType);
+          new LineRange(
+              targetChunk.getPosition(), targetChunk.last(), targetChunk, targetChangeType);
     }
 
     // (e) Extract context lines (before/after the changes)
@@ -221,36 +216,5 @@ public class DiffParserService {
    */
   private String extractDiffHeader(UnifiedDiff unifiedDiff) {
     return unifiedDiff.getHeader() != null ? unifiedDiff.getHeader() : "";
-  }
-
-  /**
-   * Calculates the total number of additions across all files.
-   *
-   * @param diffedFiles the list of diffed files
-   * @return total additions count
-   */
-  private int calculateTotalAdditions(List<DiffedFile> diffedFiles) {
-    return diffedFiles.stream()
-        .flatMap(file -> file.getLineRangesByType(LineRange.ChangeType.INSERT).stream())
-        .mapToInt(range -> range.endLine() - range.startLine() + 1)
-        .sum();
-  }
-
-  /**
-   * Calculates the total number of deletions across all files.
-   *
-   * @param diffedFiles the list of diffed files
-   * @return total deletions count
-   */
-  private int calculateTotalDeletions(List<DiffedFile> diffedFiles) {
-    return diffedFiles.stream()
-        .flatMap(
-            file -> {
-              List<LineRange> lineRangesOfTypeRemoved =
-                  file.getLineRangesByType(LineRange.ChangeType.DELETE);
-              return lineRangesOfTypeRemoved.stream();
-            })
-        .mapToInt(range -> range.endLine() - range.startLine() + 1)
-        .sum();
   }
 }
