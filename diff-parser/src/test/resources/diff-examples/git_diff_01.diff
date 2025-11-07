@@ -1,0 +1,3061 @@
+diff --git a/java-parser/ACTIONPLAN.md b/java-parser/ACTIONPLAN.md
+deleted file mode 100644
+index 0847037..0000000
+--- a/java-parser/ACTIONPLAN.md
++++ /dev/null
+@@ -1,93 +0,0 @@
+-# Java Parser - Action Plan
+-
+-## Overview
+-This module will implement Java source code parsing using JavaParser to create structured AST representations for code analysis.
+-
+-## Package Structure
+-- **Base Package**: `sono99.javaparser`
+-- **Main Classes**: `sono99.javaparser.JavaParsingService`, `sono99.javaparser.JavaParsingNode`
+-- **Supporting Classes**: `sono99.javaparser.*` (AnnotationInfo, Modifier, EnrichedContent, etc.)
+-
+-## Key Requirements from Specifications
+-
+-### From delete_me/02A.md and 02b.md
+-- Use JavaParser as primary parsing library
+-- Create lightweight domain model (JavaParsingNode) with normalized ranges
+-- Maintain mapping back to original JavaParser nodes
+-- Support enriched content with Javadoc and annotation references
+-- Handle fallback parsing for edge cases
+-
+-## Implementation Plan
+-
+-### Phase 1: Core Parsing Framework
+-1. Implement `JavaParsingService` as main parsing service
+-2. Create `JavaParsingNode` domain model with normalized ranges
+-3. Add `EnrichedContent` data structure for parsed results
+-4. Implement basic JavaParser integration
+-
+-### Phase 2: AST Node Creation
+-1. Create visitor pattern for traversing CompilationUnit
+-2. Implement node creation for classes, methods, fields
+-3. Add support for Javadoc extraction and annotation parsing
+-4. Build hierarchical node structure with parent/child relationships
+-
+-### Phase 3: Content Enrichment
+-1. Implement `JavadocRef` and `AnnotationRef` quick access references
+-2. Add enriched content generation combining code + Javadoc + annotations
+-3. Create `QuickLink` system for navigation within codebase
+-4. Support for different enrichment strategies
+-
+-### Phase 4: Advanced Features
+-1. Add fallback parsing for malformed code
+-2. Implement caching for parsed files
+-3. Add performance optimizations
+-4. Support for incremental parsing
+-
+-### Phase 5: Integration and Testing
+-1. Integrate with diff intersection service
+-2. Add comprehensive unit tests with sample Java files
+-3. Implement error handling and logging
+-4. Add performance benchmarks
+-
+-## Data Model Structure
+-
+-### JavaParsingNode
+-- filePath: String
+-- kind: NodeKind (FILE, CLASS, METHOD, FIELD, etc.)
+-- name: String and qualifiedName
+-- signature: String (normalized method/field signatures)
+-- range: startLine, startColumn, endLine, endColumn
+-- javadoc: Optional<String>
+-- annotations: List<AnnotationInfo>
+-- modifiers: Set<Modifier>
+-- children: List<JavaParsingNode>
+-- originalId: String (for back-references)
+-
+-### EnrichedContent
+-- rootNode: JavaParsingNode
+-- quickLinks: Map<String, QuickLink>
+-- metadata: Map<String, Object>
+-
+-## Parsing Strategy
+-
+-### Primary Parsing
+-- Use JavaParser with LexicalPreservingPrinter
+-- Configure for position tracking and comment preservation
+-- Handle parse exceptions gracefully
+-- Support for different Java versions
+-
+-### Fallback Mechanisms
+-- Eclipse JDT integration for complex cases
+-- Heuristic parsing for partial files
+-- Error-tolerant parsing modes
+-
+-## Testing Strategy
+-- Unit tests for parsing various Java constructs
+-- Integration tests with real Java files
+-- Performance tests for large codebases
+-- Edge case testing (malformed code, large files)
+-
+-## Integration Points
+-- Consumed by `diff-mapper-core` for AST intersection
+-- Used by `rule-engine` for code analysis
+-- Provides data for `finding-schema` objects
+diff --git a/java-parser/pom.xml b/java-parser/pom.xml
+index 8f20408..aa23043 100644
+--- a/java-parser/pom.xml
++++ b/java-parser/pom.xml
+@@ -1,8 +1,7 @@
+ <?xml version="1.0" encoding="UTF-8"?>
+ <project xmlns="http://maven.apache.org/POM/4.0.0"
+-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+-         http://maven.apache.org/xsd/maven-4.0.0.xsd">
++    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
++    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+     <modelVersion>4.0.0</modelVersion>
+ 
+     <parent>
+@@ -29,13 +28,17 @@
+             <groupId>org.springframework</groupId>
+             <artifactId>spring-context</artifactId>
+         </dependency>
+-
+         <!-- Test dependencies -->
+         <dependency>
+             <groupId>org.junit.jupiter</groupId>
+             <artifactId>junit-jupiter</artifactId>
+             <scope>test</scope>
+         </dependency>
++        <dependency>
++            <groupId>org.springframework.boot</groupId>
++            <artifactId>spring-boot-starter-test</artifactId>
++            <scope>test</scope>
++        </dependency>
+         <dependency>
+             <groupId>org.mockito</groupId>
+             <artifactId>mockito-core</artifactId>
+@@ -52,4 +55,4 @@
+             <scope>test</scope>
+         </dependency>
+     </dependencies>
+-</project>
++</project>
+\ No newline at end of file
+diff --git a/java-parser/src/main/java/com/sono99/javaparser/api/v1/model/AbstractJavaNodeV1.java b/java-parser/src/main/java/com/sono99/javaparser/api/v1/model/AbstractJavaNodeV1.java
+new file mode 100644
+index 0000000..9321266
+--- /dev/null
++++ b/java-parser/src/main/java/com/sono99/javaparser/api/v1/model/AbstractJavaNodeV1.java
+@@ -0,0 +1,98 @@
++package com.sono99.javaparser.api.v1.model;
++
++import com.github.javaparser.ast.Node;
++import java.util.List;
++
++/**
++ * Abstract base class for all nodes in the V1 Java parsing tree. Provides common properties like
++ * line ranges and basic tree traversal. Maintains a reference to the original JavaParser AST node
++ * for enhanced information access.
++ *
++ * @param <T> the type of the original JavaParser AST node, extending com.github.javaparser.ast.Node
++ * @since v1.0
++ */
++public abstract class AbstractJavaNodeV1<T extends Node> {
++
++  /** 1-based line number where this node starts. */
++  protected final int startLine;
++
++  /** 1-based line number where this node ends (inclusive). */
++  protected final int endLine;
++
++  /** The source code chunk for this node. */
++  protected final String javaCodeChunk;
++
++  /** Reference to the original JavaParser AST node for enhanced information access. */
++  protected final T originalNode;
++
++  /** Child nodes forming the subtree, immutable. */
++  protected final List<AbstractJavaNodeV1<? extends Node>> children;
++
++  /**
++   * Constructor for AbstractNodeV1.
++   *
++   * @param startLine 1-based line number where this node starts
++   * @param endLine 1-based line number where this node ends
++   * @param javaCodeChunk the source code chunk for this node
++   * @param originalNode reference to the original JavaParser AST node
++   * @param children the child nodes forming the subtree, can be empty
++   */
++  protected AbstractJavaNodeV1(
++      int startLine,
++      int endLine,
++      String javaCodeChunk,
++      T originalNode,
++      List<AbstractJavaNodeV1<? extends Node>> children) {
++    this.startLine = startLine;
++    this.endLine = endLine;
++    this.javaCodeChunk = javaCodeChunk;
++    this.originalNode = originalNode;
++    this.children = children != null ? List.copyOf(children) : List.of();
++  }
++
++  /**
++   * Gets the source code chunk represented by this node.
++   *
++   * @return the source code from startLine to endLine
++   */
++  public String getJavaChunk() {
++    return javaCodeChunk;
++  }
++
++  /**
++   * Gets the 1-based line number where this node starts.
++   *
++   * @return start line number
++   */
++  public int getStartLine() {
++    return startLine;
++  }
++
++  /**
++   * Gets the 1-based line number where this node ends (inclusive).
++   *
++   * @return end line number
++   */
++  public int getEndLine() {
++    return endLine;
++  }
++
++  /**
++   * Gets the child nodes forming the subtree.
++   *
++   * @return unmodifiable list of child nodes, may be empty
++   */
++  public List<AbstractJavaNodeV1<? extends Node>> getChildren() {
++    return children;
++  }
++
++  /**
++   * Gets the reference to the original JavaParser AST node. This allows access to additional AST
++   * information when needed.
++   *
++   * @return the original JavaParser AST node
++   */
++  public T getOriginalNode() {
++    return originalNode;
++  }
++}
+diff --git a/java-parser/src/main/java/com/sono99/javaparser/api/v1/model/AnnotationNodeV1.java b/java-parser/src/main/java/com/sono99/javaparser/api/v1/model/AnnotationNodeV1.java
+new file mode 100644
+index 0000000..f51eb77
+--- /dev/null
++++ b/java-parser/src/main/java/com/sono99/javaparser/api/v1/model/AnnotationNodeV1.java
+@@ -0,0 +1,46 @@
++package com.sono99.javaparser.api.v1.model;
++
++import com.github.javaparser.ast.expr.AnnotationExpr;
++import java.util.List;
++
++/**
++ * Represents a V1 annotation attached to a Java element. Extends AbstractJavaNodeV1 to provide
++ * common AST node functionality and ensure proper inheritance hierarchy.
++ *
++ * @since v1.0
++ */
++public class AnnotationNodeV1 extends AbstractJavaNodeV1<AnnotationExpr> {
++
++  /** The annotation name (e.g., "@Entity"). */
++  private final String name;
++
++  /**
++   * Constructor for AnnotationNodeV1.
++   *
++   * @param startLine 1-based line number where this annotation starts
++   * @param endLine 1-based line number where this annotation ends
++   * @param name the annotation name
++   * @param javaCodeChunk the complete annotation text
++   * @param originalNode reference to the original JavaParser AnnotationExpr
++   * @param children the child nodes, typically empty for annotations
++   */
++  public AnnotationNodeV1(
++      int startLine,
++      int endLine,
++      String name,
++      String javaCodeChunk,
++      AnnotationExpr originalNode,
++      List<AbstractJavaNodeV1<? extends com.github.javaparser.ast.Node>> children) {
++    super(startLine, endLine, javaCodeChunk, originalNode, children);
++    this.name = name;
++  }
++
++  /**
++   * Gets the annotation name.
++   *
++   * @return the annotation name
++   */
++  public String getName() {
++    return name;
++  }
++}
+diff --git a/java-parser/src/main/java/com/sono99/javaparser/api/v1/model/ClassDeclarationNodeV1.java b/java-parser/src/main/java/com/sono99/javaparser/api/v1/model/ClassDeclarationNodeV1.java
+new file mode 100644
+index 0000000..db4decc
+--- /dev/null
++++ b/java-parser/src/main/java/com/sono99/javaparser/api/v1/model/ClassDeclarationNodeV1.java
+@@ -0,0 +1,101 @@
++package com.sono99.javaparser.api.v1.model;
++
++import com.github.javaparser.ast.body.TypeDeclaration;
++import java.util.List;
++
++/**
++ * Represents a V1 class declaration in Java source code. Extends AbstractJavaNodeV1 to provide
++ * common AST node functionality and ensure proper inheritance hierarchy. Includes support for
++ * Javadoc comments and annotations.
++ *
++ * @since v1.0
++ */
++public class ClassDeclarationNodeV1 extends AbstractJavaNodeV1<TypeDeclaration<?>> {
++
++  /** The class name. */
++  private final String name;
++
++  /** Associated Javadoc comment. */
++  private final JavadocNodeV1 javadoc;
++
++  /** Associated annotations. */
++  private final List<AnnotationNodeV1> annotations;
++
++  /**
++   * Constructor for ClassDeclarationNodeV1.
++   *
++   * @param startLine 1-based line number where this class declaration starts
++   * @param endLine 1-based line number where this class declaration ends
++   * @param name the class name
++   * @param javaCodeChunk the class declaration body
++   * @param originalNode reference to the original JavaParser TypeDeclaration
++   * @param javadoc the associated Javadoc comment, can be null
++   * @param annotations the associated annotations, can be null
++   * @param children the child nodes (methods, fields, inner classes)
++   */
++  public ClassDeclarationNodeV1(
++      int startLine,
++      int endLine,
++      String name,
++      String javaCodeChunk,
++      TypeDeclaration<?> originalNode,
++      JavadocNodeV1 javadoc,
++      List<AnnotationNodeV1> annotations,
++      List<AbstractJavaNodeV1<? extends com.github.javaparser.ast.Node>> children) {
++    super(startLine, endLine, javaCodeChunk, originalNode, children);
++    this.name = name;
++    this.javadoc = javadoc;
++    this.annotations = annotations != null ? List.copyOf(annotations) : List.of();
++  }
++
++  /**
++   * Gets the class name.
++   *
++   * @return the class name
++   */
++  public String getName() {
++    return name;
++  }
++
++  /**
++   * Gets the associated Javadoc.
++   *
++   * @return Javadoc node, or null if none
++   */
++  public JavadocNodeV1 getJavadoc() {
++    return javadoc;
++  }
++
++  /**
++   * Gets the associated annotations.
++   *
++   * @return list of annotation nodes, may be empty
++   */
++  public List<AnnotationNodeV1> getAnnotations() {
++    return annotations;
++  }
++
++  /**
++   * Gets all field declarations within this class.
++   *
++   * @return a list of field declaration nodes
++   */
++  public List<FieldDeclarationNodeV1> getFieldDeclarations() {
++    return getChildren().stream()
++        .filter(FieldDeclarationNodeV1.class::isInstance)
++        .map(FieldDeclarationNodeV1.class::cast)
++        .toList();
++  }
++
++  /**
++   * Gets all method declarations within this class.
++   *
++   * @return a list of method declaration nodes
++   */
++  public List<MethodDeclarationNodeV1> getMethodDeclarations() {
++    return getChildren().stream()
++        .filter(MethodDeclarationNodeV1.class::isInstance)
++        .map(MethodDeclarationNodeV1.class::cast)
++        .toList();
++  }
++}
+diff --git a/java-parser/src/main/java/com/sono99/javaparser/api/v1/model/CompilationUnitNodeV1.java b/java-parser/src/main/java/com/sono99/javaparser/api/v1/model/CompilationUnitNodeV1.java
+new file mode 100644
+index 0000000..40da871
+--- /dev/null
++++ b/java-parser/src/main/java/com/sono99/javaparser/api/v1/model/CompilationUnitNodeV1.java
+@@ -0,0 +1,83 @@
++package com.sono99.javaparser.api.v1.model;
++
++import com.github.javaparser.ast.CompilationUnit;
++import java.util.List;
++
++/**
++ * Represents a V1 root node for a Java compilation unit (a source file). Extends AbstractJavaNodeV1
++ * to provide common AST node functionality and ensure proper inheritance hierarchy.
++ *
++ * @since v1.0
++ */
++public class CompilationUnitNodeV1 extends AbstractJavaNodeV1<CompilationUnit> {
++
++  /** Source file path in repository. */
++  private final String repositoryPath;
++
++  /**
++   * Constructor for CompilationUnitNodeV1.
++   *
++   * @param startLine 1-based line number where this compilation unit starts
++   * @param endLine 1-based line number where this compilation unit ends
++   * @param javaCodeChunk the full source code of the Java file
++   * @param originalNode reference to the original JavaParser CompilationUnit
++   * @param repositoryPath path to the source file in repository
++   * @param children the child nodes forming the subtree, typically classes/packages/imports
++   */
++  public CompilationUnitNodeV1(
++      int startLine,
++      int endLine,
++      String javaCodeChunk,
++      CompilationUnit originalNode,
++      String repositoryPath,
++      List<AbstractJavaNodeV1<? extends com.github.javaparser.ast.Node>> children) {
++    super(startLine, endLine, javaCodeChunk, originalNode, children);
++    this.repositoryPath = repositoryPath;
++  }
++
++  /**
++   * Gets the repository path for this compilation unit.
++   *
++   * @return the source file path in repository
++   */
++  public String getRepositoryPath() {
++    return repositoryPath;
++  }
++
++  /**
++   * Gets the package declaration (first child if present).
++   *
++   * @return package declaration, or null for default package
++   */
++  public PackageDeclarationNodeV1 getPackageDeclaration() {
++    return getChildren().stream()
++        .filter(PackageDeclarationNodeV1.class::isInstance)
++        .map(PackageDeclarationNodeV1.class::cast)
++        .findFirst()
++        .orElse(null);
++  }
++
++  /**
++   * Gets all import declarations.
++   *
++   * @return list of import declaration nodes
++   */
++  public List<ImportDeclarationNodeV1> getImportDeclarations() {
++    return getChildren().stream()
++        .filter(ImportDeclarationNodeV1.class::isInstance)
++        .map(ImportDeclarationNodeV1.class::cast)
++        .toList();
++  }
++
++  /**
++   * Gets all class declarations.
++   *
++   * @return list of class declaration nodes
++   */
++  public List<ClassDeclarationNodeV1> getClassDeclarations() {
++    return getChildren().stream()
++        .filter(ClassDeclarationNodeV1.class::isInstance)
++        .map(ClassDeclarationNodeV1.class::cast)
++        .toList();
++  }
++}
+diff --git a/java-parser/src/main/java/com/sono99/javaparser/api/v1/model/CompilcationUnitNodeV1.java b/java-parser/src/main/java/com/sono99/javaparser/api/v1/model/CompilcationUnitNodeV1.java
+deleted file mode 100644
+index 272f2d5..0000000
+--- a/java-parser/src/main/java/com/sono99/javaparser/api/v1/model/CompilcationUnitNodeV1.java
++++ /dev/null
+@@ -1,13 +0,0 @@
+-package com.sono99.javaparser.api.v1.model;
+-
+-// FIXME: Temporary implementation - replace with proper V1 DTO when generic service is stable
+-// This is just to get compilation working so we can focus on testing the core parsing logic
+-public class CompilcationUnitNodeV1 {
+-
+-  // TODO: Add proper V1 API fields here mirroring CompilationUnitNode but without
+-  // internal details
+-
+-  public CompilcationUnitNodeV1() {
+-    // Placeholder constructor
+-  }
+-}
+diff --git a/java-parser/src/main/java/com/sono99/javaparser/api/v1/model/FieldDeclarationNodeV1.java b/java-parser/src/main/java/com/sono99/javaparser/api/v1/model/FieldDeclarationNodeV1.java
+new file mode 100644
+index 0000000..9de3451
+--- /dev/null
++++ b/java-parser/src/main/java/com/sono99/javaparser/api/v1/model/FieldDeclarationNodeV1.java
+@@ -0,0 +1,92 @@
++package com.sono99.javaparser.api.v1.model;
++
++import com.github.javaparser.ast.body.FieldDeclaration;
++import java.util.List;
++
++/**
++ * Represents a V1 field declaration in Java source code. Extends AbstractJavaNodeV1 to provide
++ * common AST node functionality and ensure proper inheritance hierarchy. Includes support for
++ * Javadoc comments and annotations.
++ *
++ * @since v1.0
++ */
++public class FieldDeclarationNodeV1 extends AbstractJavaNodeV1<FieldDeclaration> {
++
++  /** The field name. */
++  private final String name;
++
++  /** The field type. */
++  private final String type;
++
++  /** Associated Javadoc comment. */
++  private final JavadocNodeV1 javadoc;
++
++  /** Associated annotations. */
++  private final List<AnnotationNodeV1> annotations;
++
++  /**
++   * Constructor for FieldDeclarationNodeV1.
++   *
++   * @param startLine 1-based line number where this field declaration starts
++   * @param endLine 1-based line number where this field declaration ends
++   * @param name the field name
++   * @param type the field type
++   * @param javaCodeChunk the field declaration text
++   * @param originalNode reference to the original JavaParser FieldDeclaration
++   * @param javadoc the associated Javadoc comment, can be null
++   * @param annotations the associated annotations, can be null
++   * @param children empty for fields
++   */
++  public FieldDeclarationNodeV1(
++      int startLine,
++      int endLine,
++      String name,
++      String type,
++      String javaCodeChunk,
++      FieldDeclaration originalNode,
++      JavadocNodeV1 javadoc,
++      List<AnnotationNodeV1> annotations,
++      List<AbstractJavaNodeV1<? extends com.github.javaparser.ast.Node>> children) {
++    super(startLine, endLine, javaCodeChunk, originalNode, children);
++    this.name = name;
++    this.type = type;
++    this.javadoc = javadoc;
++    this.annotations = annotations != null ? List.copyOf(annotations) : List.of();
++  }
++
++  /**
++   * Gets the field name.
++   *
++   * @return the field name
++   */
++  public String getName() {
++    return name;
++  }
++
++  /**
++   * Gets the field type.
++   *
++   * @return the field type
++   */
++  public String getType() {
++    return type;
++  }
++
++  /**
++   * Gets the associated Javadoc.
++   *
++   * @return Javadoc node, or null if none
++   */
++  public JavadocNodeV1 getJavadoc() {
++    return javadoc;
++  }
++
++  /**
++   * Gets the associated annotations.
++   *
++   * @return list of annotation nodes, may be empty
++   */
++  public List<AnnotationNodeV1> getAnnotations() {
++    return annotations;
++  }
++}
+diff --git a/java-parser/src/main/java/com/sono99/javaparser/api/v1/model/ImportDeclarationNodeV1.java b/java-parser/src/main/java/com/sono99/javaparser/api/v1/model/ImportDeclarationNodeV1.java
+new file mode 100644
+index 0000000..2dbdee8
+--- /dev/null
++++ b/java-parser/src/main/java/com/sono99/javaparser/api/v1/model/ImportDeclarationNodeV1.java
+@@ -0,0 +1,76 @@
++package com.sono99.javaparser.api.v1.model;
++
++import com.github.javaparser.ast.ImportDeclaration;
++import java.util.List;
++
++/**
++ * Represents a V1 import declaration in Java source code. Extends AbstractJavaNodeV1 to provide
++ * common AST node functionality and ensure proper inheritance hierarchy.
++ *
++ * @since v1.0
++ */
++public class ImportDeclarationNodeV1 extends AbstractJavaNodeV1<ImportDeclaration> {
++
++  /** The full imported name. */
++  private final String importName;
++
++  /** True if this is a static import. */
++  private final boolean isStatic;
++
++  /** True if this is a wildcard import. */
++  private final boolean isAsterisk;
++
++  /**
++   * Constructor for ImportDeclarationNodeV1.
++   *
++   * @param startLine 1-based line number where this import declaration starts
++   * @param endLine 1-based line number where this import declaration ends
++   * @param importName the full imported name
++   * @param isStatic true if this is a static import
++   * @param isAsterisk true if this is a wildcard import
++   * @param javaCodeChunk the complete declaration text
++   * @param originalNode reference to the original JavaParser ImportDeclaration
++   * @param children the child nodes, typically empty for imports
++   */
++  public ImportDeclarationNodeV1(
++      int startLine,
++      int endLine,
++      String importName,
++      boolean isStatic,
++      boolean isAsterisk,
++      String javaCodeChunk,
++      ImportDeclaration originalNode,
++      List<AbstractJavaNodeV1<? extends com.github.javaparser.ast.Node>> children) {
++    super(startLine, endLine, javaCodeChunk, originalNode, children);
++    this.importName = importName;
++    this.isStatic = isStatic;
++    this.isAsterisk = isAsterisk;
++  }
++
++  /**
++   * Gets the full imported name.
++   *
++   * @return the imported name
++   */
++  public String getImportName() {
++    return importName;
++  }
++
++  /**
++   * Checks if this is a static import.
++   *
++   * @return true if static import
++   */
++  public boolean isStatic() {
++    return isStatic;
++  }
++
++  /**
++   * Checks if this is a wildcard import.
++   *
++   * @return true if wildcard import
++   */
++  public boolean isAsterisk() {
++    return isAsterisk;
++  }
++}
+diff --git a/java-parser/src/main/java/com/sono99/javaparser/api/v1/model/JavadocNodeV1.java b/java-parser/src/main/java/com/sono99/javaparser/api/v1/model/JavadocNodeV1.java
+new file mode 100644
+index 0000000..07a6598
+--- /dev/null
++++ b/java-parser/src/main/java/com/sono99/javaparser/api/v1/model/JavadocNodeV1.java
+@@ -0,0 +1,30 @@
++package com.sono99.javaparser.api.v1.model;
++
++import com.github.javaparser.ast.comments.JavadocComment;
++import java.util.List;
++
++/**
++ * Represents a V1 Javadoc comment block. This is an immutable record.
++ *
++ * @param startLine 1-based line number where this Javadoc starts
++ * @param endLine 1-based line number where this Javadoc ends
++ * @param javaCodeChunk the complete Javadoc text with delimiters
++ * @param originalNode reference to the original JavaParser JavadocComment
++ * @param children should be empty, will be ignored for Javadoc nodes
++ * @since v1.0
++ */
++public record JavadocNodeV1(
++    int startLine,
++    int endLine,
++    String javaCodeChunk,
++    JavadocComment originalNode,
++    List<AbstractJavaNodeV1<?>> children) {
++
++  /**
++   * Canonical constructor for JavadocNodeV1. Ensures that the children list is always empty, as
++   * Javadoc nodes do not have children in this model.
++   */
++  public JavadocNodeV1 {
++    children = List.of(); // Javadoc nodes have no children
++  }
++}
+diff --git a/java-parser/src/main/java/com/sono99/javaparser/api/v1/model/MethodDeclarationNodeV1.java b/java-parser/src/main/java/com/sono99/javaparser/api/v1/model/MethodDeclarationNodeV1.java
+new file mode 100644
+index 0000000..89bd737
+--- /dev/null
++++ b/java-parser/src/main/java/com/sono99/javaparser/api/v1/model/MethodDeclarationNodeV1.java
+@@ -0,0 +1,92 @@
++package com.sono99.javaparser.api.v1.model;
++
++import com.github.javaparser.ast.body.MethodDeclaration;
++import java.util.List;
++
++/**
++ * Represents a V1 method declaration in Java source code. Extends AbstractJavaNodeV1 to provide
++ * common AST node functionality and ensure proper inheritance hierarchy. Includes support for
++ * Javadoc comments and annotations.
++ *
++ * @since v1.0
++ */
++public class MethodDeclarationNodeV1 extends AbstractJavaNodeV1<MethodDeclaration> {
++
++  /** The method name. */
++  private final String name;
++
++  /** The complete method signature. */
++  private final String signature;
++
++  /** Associated Javadoc comment. */
++  private final JavadocNodeV1 javadoc;
++
++  /** Associated annotations. */
++  private final List<AnnotationNodeV1> annotations;
++
++  /**
++   * Constructor for MethodDeclarationNodeV1.
++   *
++   * @param startLine 1-based line number where this method declaration starts
++   * @param endLine 1-based line number where this method declaration ends
++   * @param name the method name
++   * @param signature the complete method signature
++   * @param javaCodeChunk the method implementation
++   * @param originalNode reference to the original JavaParser MethodDeclaration
++   * @param javadoc the associated Javadoc comment, can be null
++   * @param annotations the associated annotations, can be null
++   * @param children method body contents
++   */
++  public MethodDeclarationNodeV1(
++      int startLine,
++      int endLine,
++      String name,
++      String signature,
++      String javaCodeChunk,
++      MethodDeclaration originalNode,
++      JavadocNodeV1 javadoc,
++      List<AnnotationNodeV1> annotations,
++      List<AbstractJavaNodeV1<? extends com.github.javaparser.ast.Node>> children) {
++    super(startLine, endLine, javaCodeChunk, originalNode, children);
++    this.name = name;
++    this.signature = signature;
++    this.javadoc = javadoc;
++    this.annotations = annotations != null ? List.copyOf(annotations) : List.of();
++  }
++
++  /**
++   * Gets the method name.
++   *
++   * @return the method name
++   */
++  public String getName() {
++    return name;
++  }
++
++  /**
++   * Gets the complete method signature.
++   *
++   * @return the method signature
++   */
++  public String getSignature() {
++    return signature;
++  }
++
++  /**
++   * Gets the associated Javadoc.
++   *
++   * @return Javadoc node, or null if none
++   */
++  public JavadocNodeV1 getJavadoc() {
++    return javadoc;
++  }
++
++  /**
++   * Gets the associated annotations.
++   *
++   * @return list of annotation nodes, may be empty
++   */
++  public List<AnnotationNodeV1> getAnnotations() {
++    return annotations;
++  }
++}
+diff --git a/java-parser/src/main/java/com/sono99/javaparser/api/v1/model/PackageDeclarationNodeV1.java b/java-parser/src/main/java/com/sono99/javaparser/api/v1/model/PackageDeclarationNodeV1.java
+new file mode 100644
+index 0000000..4d94c1a
+--- /dev/null
++++ b/java-parser/src/main/java/com/sono99/javaparser/api/v1/model/PackageDeclarationNodeV1.java
+@@ -0,0 +1,55 @@
++package com.sono99.javaparser.api.v1.model;
++
++import com.github.javaparser.ast.PackageDeclaration;
++import java.util.List;
++
++/**
++ * Represents a V1 package declaration in Java source code. Extends AbstractJavaNodeV1 to provide
++ * common AST node functionality and ensure proper inheritance hierarchy.
++ *
++ * @since v1.0
++ */
++public class PackageDeclarationNodeV1 extends AbstractJavaNodeV1<PackageDeclaration> {
++
++  /** The full package name (e.g., "com.example.animals"). */
++  private final String packageName;
++
++  /**
++   * Constructor for PackageDeclarationNodeV1.
++   *
++   * @param startLine 1-based line number where this package declaration starts
++   * @param endLine 1-based line number where this package declaration ends
++   * @param packageName the full package name
++   * @param javaCodeChunk the complete declaration text
++   * @param originalNode reference to the original JavaParser PackageDeclaration
++   * @param children the child nodes, typically empty for package declarations
++   */
++  public PackageDeclarationNodeV1(
++      int startLine,
++      int endLine,
++      String packageName,
++      String javaCodeChunk,
++      PackageDeclaration originalNode,
++      List<AbstractJavaNodeV1<? extends com.github.javaparser.ast.Node>> children) {
++    super(startLine, endLine, javaCodeChunk, originalNode, children);
++    this.packageName = packageName;
++  }
++
++  /**
++   * Gets the package name.
++   *
++   * @return the full package name
++   */
++  public String getPackageName() {
++    return packageName;
++  }
++
++  /**
++   * Gets the package value (same as package name for backwards compatibility).
++   *
++   * @return the package name
++   */
++  public String getValue() {
++    return packageName;
++  }
++}
+diff --git a/java-parser/src/main/java/com/sono99/javaparser/api/v1/service/JavaParsingServiceV1.java b/java-parser/src/main/java/com/sono99/javaparser/api/v1/service/JavaParsingServiceV1.java
+index 98ac7be..924b53e 100644
+--- a/java-parser/src/main/java/com/sono99/javaparser/api/v1/service/JavaParsingServiceV1.java
++++ b/java-parser/src/main/java/com/sono99/javaparser/api/v1/service/JavaParsingServiceV1.java
+@@ -1,6 +1,6 @@
+ package com.sono99.javaparser.api.v1.service;
+ 
+-import com.sono99.javaparser.api.v1.model.CompilcationUnitNodeV1;
++import com.sono99.javaparser.api.v1.model.CompilationUnitNodeV1;
+ import java.io.InputStream;
+ 
+ /**
+@@ -16,10 +16,20 @@ public interface JavaParsingServiceV1 {
+    *
+    * @param source the InputStream containing the Java source code
+    * @param sourceName the logical name of the source (e.g., file name or PR path for logging)
+-   * @return CompilcationUnitNodeV1 containing the parsed AST, nodes, and metadata
++   * @return CompilationUnitNodeV1 containing the parsed AST, nodes, and metadata
+    * @throws RuntimeException if parsing fails due to syntax errors or IO issues
+    */
+-  CompilcationUnitNodeV1 parse(InputStream source, String sourceName);
++  CompilationUnitNodeV1 parse(InputStream source, String sourceName);
++
++  /**
++   * Parses Java source code from a String and returns the enriched content representation.
++   *
++   * @param source the String containing the Java source code
++   * @param repositoryPath the path to the source file in the repository
++   * @return CompilationUnitNodeV1 containing the parsed AST, nodes, and metadata
++   * @throws RuntimeException if parsing fails due to syntax errors
++   */
++  CompilationUnitNodeV1 parseCompilationUnit(String source, String repositoryPath);
+ 
+   /**
+    * Determines if the given InputStream can be parsed as Java source code. Performs basic
+diff --git a/java-parser/src/main/java/com/sono99/javaparser/impl/v1/JavaParsingServiceV1Impl.java b/java-parser/src/main/java/com/sono99/javaparser/impl/v1/JavaParsingServiceV1Impl.java
+deleted file mode 100644
+index 368c805..0000000
+--- a/java-parser/src/main/java/com/sono99/javaparser/impl/v1/JavaParsingServiceV1Impl.java
++++ /dev/null
+@@ -1,27 +0,0 @@
+-package com.sono99.javaparser.impl.v1;
+-
+-import com.sono99.javaparser.api.v1.model.CompilcationUnitNodeV1;
+-import com.sono99.javaparser.api.v1.service.JavaParsingServiceV1;
+-import java.io.InputStream;
+-
+-public class JavaParsingServiceV1Impl implements JavaParsingServiceV1 {
+-
+-  @Override
+-  public CompilcationUnitNodeV1 parse(InputStream source, String sourceName) {
+-    // FIXME: Implement V1 API wrapper once generic parsing service is stable
+-    // This will convert from internal CompilationUnitNode to V1 DTOs
+-    throw new UnsupportedOperationException(
+-        "V1 API not yet implemented - focus on generic service first");
+-  }
+-
+-  @Override
+-  public boolean canParse(InputStream source, String sourceName) {
+-    // FIXME: Delegate to generic service once available
+-    // Simple content validation - extension check and basic header inspection
+-    if (sourceName != null && sourceName.endsWith(".java")) {
+-      return true;
+-    }
+-    // FIXME: Add basic source code inspection
+-    return false;
+-  }
+-}
+diff --git a/java-parser/src/main/java/com/sono99/javaparser/impl/v1/converter/AnnotationNodeConverterV1.java b/java-parser/src/main/java/com/sono99/javaparser/impl/v1/converter/AnnotationNodeConverterV1.java
+new file mode 100644
+index 0000000..eb04260
+--- /dev/null
++++ b/java-parser/src/main/java/com/sono99/javaparser/impl/v1/converter/AnnotationNodeConverterV1.java
+@@ -0,0 +1,34 @@
++package com.sono99.javaparser.impl.v1.converter;
++
++import com.sono99.javaparser.api.v1.model.AnnotationNodeV1;
++import com.sono99.javaparser.impl.generic.model.AnnotationNode;
++import com.sono99.javaparser.impl.v1.service.ConversionServiceV1;
++import com.sono99.javaparser.impl.v1.service.NodeConverterV1;
++import org.springframework.stereotype.Component;
++
++/** Converter to transform a generic {@link AnnotationNode} to a {@link AnnotationNodeV1}. */
++@Component
++public class AnnotationNodeConverterV1
++    implements NodeConverterV1<AnnotationNode, AnnotationNodeV1> {
++
++  @Override
++  public AnnotationNodeV1 convert(AnnotationNode source, ConversionServiceV1 conversionService) {
++    return new AnnotationNodeV1(
++        source.getStartLine(),
++        source.getEndLine(),
++        source.getName(),
++        source.getJavaChunk(),
++        source.getOriginalNode(),
++        java.util.List.of());
++  }
++
++  @Override
++  public Class<AnnotationNode> getSourceType() {
++    return AnnotationNode.class;
++  }
++
++  @Override
++  public Class<AnnotationNodeV1> getTargetType() {
++    return AnnotationNodeV1.class;
++  }
++}
+diff --git a/java-parser/src/main/java/com/sono99/javaparser/impl/v1/converter/ClassDeclarationNodeConverterV1.java b/java-parser/src/main/java/com/sono99/javaparser/impl/v1/converter/ClassDeclarationNodeConverterV1.java
+new file mode 100644
+index 0000000..2e7e30b
+--- /dev/null
++++ b/java-parser/src/main/java/com/sono99/javaparser/impl/v1/converter/ClassDeclarationNodeConverterV1.java
+@@ -0,0 +1,57 @@
++package com.sono99.javaparser.impl.v1.converter;
++
++import com.sono99.javaparser.api.v1.model.AbstractJavaNodeV1;
++import com.sono99.javaparser.api.v1.model.AnnotationNodeV1;
++import com.sono99.javaparser.api.v1.model.ClassDeclarationNodeV1;
++import com.sono99.javaparser.api.v1.model.JavadocNodeV1;
++import com.sono99.javaparser.impl.generic.model.ClassDeclarationNode;
++import com.sono99.javaparser.impl.v1.service.ConversionServiceV1;
++import com.sono99.javaparser.impl.v1.service.NodeConverterV1;
++import java.util.List;
++import java.util.stream.Collectors;
++import org.springframework.stereotype.Component;
++
++/**
++ * Converter to transform a generic {@link ClassDeclarationNode} to a {@link
++ * ClassDeclarationNodeV1}.
++ */
++@Component
++public class ClassDeclarationNodeConverterV1
++    implements NodeConverterV1<ClassDeclarationNode, ClassDeclarationNodeV1> {
++
++  @Override
++  public ClassDeclarationNodeV1 convert(
++      ClassDeclarationNode source, ConversionServiceV1 conversionService) {
++    @SuppressWarnings("unchecked")
++    List<AbstractJavaNodeV1<?>> children =
++        (List<AbstractJavaNodeV1<?>>)
++            (List<?>)
++                source.getChildren().stream()
++                    .map(child -> conversionService.convert(child, Object.class))
++                    .map(AbstractJavaNodeV1.class::cast)
++                    .collect(Collectors.toList());
++    return new ClassDeclarationNodeV1(
++        source.getStartLine(),
++        source.getEndLine(),
++        source.getName(),
++        source.getJavaChunk(),
++        source.getOriginalNode(),
++        source.getJavadoc() == null
++            ? null
++            : conversionService.convert(source.getJavadoc(), JavadocNodeV1.class),
++        source.getAnnotations().stream()
++            .map(annotation -> conversionService.convert(annotation, AnnotationNodeV1.class))
++            .toList(),
++        children);
++  }
++
++  @Override
++  public Class<ClassDeclarationNode> getSourceType() {
++    return ClassDeclarationNode.class;
++  }
++
++  @Override
++  public Class<ClassDeclarationNodeV1> getTargetType() {
++    return ClassDeclarationNodeV1.class;
++  }
++}
+diff --git a/java-parser/src/main/java/com/sono99/javaparser/impl/v1/converter/CompilationUnitNodeConverterV1.java b/java-parser/src/main/java/com/sono99/javaparser/impl/v1/converter/CompilationUnitNodeConverterV1.java
+new file mode 100644
+index 0000000..4b4d656
+--- /dev/null
++++ b/java-parser/src/main/java/com/sono99/javaparser/impl/v1/converter/CompilationUnitNodeConverterV1.java
+@@ -0,0 +1,48 @@
++package com.sono99.javaparser.impl.v1.converter;
++
++import com.sono99.javaparser.api.v1.model.AbstractJavaNodeV1;
++import com.sono99.javaparser.api.v1.model.CompilationUnitNodeV1;
++import com.sono99.javaparser.impl.generic.model.CompilationUnitNode;
++import com.sono99.javaparser.impl.v1.service.ConversionServiceV1;
++import com.sono99.javaparser.impl.v1.service.NodeConverterV1;
++import java.util.List;
++import java.util.stream.Collectors;
++import org.springframework.stereotype.Component;
++
++/**
++ * Converter to transform a generic {@link CompilationUnitNode} to a {@link CompilationUnitNodeV1}.
++ */
++@Component
++public class CompilationUnitNodeConverterV1
++    implements NodeConverterV1<CompilationUnitNode, CompilationUnitNodeV1> {
++
++  @Override
++  public CompilationUnitNodeV1 convert(
++      CompilationUnitNode source, ConversionServiceV1 conversionService) {
++    @SuppressWarnings("unchecked")
++    List<AbstractJavaNodeV1<?>> children =
++        (List<AbstractJavaNodeV1<?>>)
++            (List<?>)
++                source.getChildren().stream()
++                    .map(child -> conversionService.convert(child, Object.class))
++                    .map(AbstractJavaNodeV1.class::cast)
++                    .collect(Collectors.toList());
++    return new CompilationUnitNodeV1(
++        source.getStartLine(),
++        source.getEndLine(),
++        source.getJavaChunk(),
++        source.getOriginalNode(),
++        source.getRepositoryPath(),
++        children);
++  }
++
++  @Override
++  public Class<CompilationUnitNode> getSourceType() {
++    return CompilationUnitNode.class;
++  }
++
++  @Override
++  public Class<CompilationUnitNodeV1> getTargetType() {
++    return CompilationUnitNodeV1.class;
++  }
++}
+diff --git a/java-parser/src/main/java/com/sono99/javaparser/impl/v1/converter/FieldDeclarationNodeConverterV1.java b/java-parser/src/main/java/com/sono99/javaparser/impl/v1/converter/FieldDeclarationNodeConverterV1.java
+new file mode 100644
+index 0000000..7c6abe2
+--- /dev/null
++++ b/java-parser/src/main/java/com/sono99/javaparser/impl/v1/converter/FieldDeclarationNodeConverterV1.java
+@@ -0,0 +1,48 @@
++package com.sono99.javaparser.impl.v1.converter;
++
++import com.sono99.javaparser.api.v1.model.AnnotationNodeV1;
++import com.sono99.javaparser.api.v1.model.FieldDeclarationNodeV1;
++import com.sono99.javaparser.api.v1.model.JavadocNodeV1;
++import com.sono99.javaparser.impl.generic.model.FieldDeclarationNode;
++import com.sono99.javaparser.impl.v1.service.ConversionServiceV1;
++import com.sono99.javaparser.impl.v1.service.NodeConverterV1;
++import java.util.stream.Collectors;
++import org.springframework.stereotype.Component;
++
++/**
++ * Converter to transform a generic {@link FieldDeclarationNode} to a {@link
++ * FieldDeclarationNodeV1}.
++ */
++@Component
++public class FieldDeclarationNodeConverterV1
++    implements NodeConverterV1<FieldDeclarationNode, FieldDeclarationNodeV1> {
++
++  @Override
++  public FieldDeclarationNodeV1 convert(
++      FieldDeclarationNode source, ConversionServiceV1 conversionService) {
++    return new FieldDeclarationNodeV1(
++        source.getStartLine(),
++        source.getEndLine(),
++        source.getName(),
++        source.getType(),
++        source.getJavaChunk(),
++        source.getOriginalNode(),
++        source.getJavadoc() == null
++            ? null
++            : conversionService.convert(source.getJavadoc(), JavadocNodeV1.class),
++        source.getAnnotations().stream()
++            .map(annotation -> conversionService.convert(annotation, AnnotationNodeV1.class))
++            .collect(Collectors.toList()),
++        java.util.List.of());
++  }
++
++  @Override
++  public Class<FieldDeclarationNode> getSourceType() {
++    return FieldDeclarationNode.class;
++  }
++
++  @Override
++  public Class<FieldDeclarationNodeV1> getTargetType() {
++    return FieldDeclarationNodeV1.class;
++  }
++}
+diff --git a/java-parser/src/main/java/com/sono99/javaparser/impl/v1/converter/ImportDeclarationNodeConverterV1.java b/java-parser/src/main/java/com/sono99/javaparser/impl/v1/converter/ImportDeclarationNodeConverterV1.java
+new file mode 100644
+index 0000000..a9bb53d
+--- /dev/null
++++ b/java-parser/src/main/java/com/sono99/javaparser/impl/v1/converter/ImportDeclarationNodeConverterV1.java
+@@ -0,0 +1,40 @@
++package com.sono99.javaparser.impl.v1.converter;
++
++import com.sono99.javaparser.api.v1.model.ImportDeclarationNodeV1;
++import com.sono99.javaparser.impl.generic.model.ImportDeclarationNode;
++import com.sono99.javaparser.impl.v1.service.ConversionServiceV1;
++import com.sono99.javaparser.impl.v1.service.NodeConverterV1;
++import org.springframework.stereotype.Component;
++
++/**
++ * Converter to transform a generic {@link ImportDeclarationNode} to a {@link
++ * ImportDeclarationNodeV1}.
++ */
++@Component
++public class ImportDeclarationNodeConverterV1
++    implements NodeConverterV1<ImportDeclarationNode, ImportDeclarationNodeV1> {
++
++  @Override
++  public ImportDeclarationNodeV1 convert(
++      ImportDeclarationNode source, ConversionServiceV1 conversionService) {
++    return new ImportDeclarationNodeV1(
++        source.getStartLine(),
++        source.getEndLine(),
++        source.getImportName(),
++        source.isStatic(),
++        source.isAsterisk(),
++        source.getJavaChunk(),
++        source.getOriginalNode(),
++        java.util.List.of());
++  }
++
++  @Override
++  public Class<ImportDeclarationNode> getSourceType() {
++    return ImportDeclarationNode.class;
++  }
++
++  @Override
++  public Class<ImportDeclarationNodeV1> getTargetType() {
++    return ImportDeclarationNodeV1.class;
++  }
++}
+diff --git a/java-parser/src/main/java/com/sono99/javaparser/impl/v1/converter/JavadocNodeConverterV1.java b/java-parser/src/main/java/com/sono99/javaparser/impl/v1/converter/JavadocNodeConverterV1.java
+new file mode 100644
+index 0000000..fff96a9
+--- /dev/null
++++ b/java-parser/src/main/java/com/sono99/javaparser/impl/v1/converter/JavadocNodeConverterV1.java
+@@ -0,0 +1,32 @@
++package com.sono99.javaparser.impl.v1.converter;
++
++import com.sono99.javaparser.api.v1.model.JavadocNodeV1;
++import com.sono99.javaparser.impl.generic.model.JavadocNode;
++import com.sono99.javaparser.impl.v1.service.ConversionServiceV1;
++import com.sono99.javaparser.impl.v1.service.NodeConverterV1;
++import org.springframework.stereotype.Component;
++
++/** Converter to transform a generic {@link JavadocNode} to a {@link JavadocNodeV1}. */
++@Component
++public class JavadocNodeConverterV1 implements NodeConverterV1<JavadocNode, JavadocNodeV1> {
++
++  @Override
++  public JavadocNodeV1 convert(JavadocNode source, ConversionServiceV1 conversionService) {
++    return new JavadocNodeV1(
++        source.getStartLine(),
++        source.getEndLine(),
++        source.getJavaChunk(),
++        source.getOriginalNode(),
++        java.util.List.of());
++  }
++
++  @Override
++  public Class<JavadocNode> getSourceType() {
++    return JavadocNode.class;
++  }
++
++  @Override
++  public Class<JavadocNodeV1> getTargetType() {
++    return JavadocNodeV1.class;
++  }
++}
+diff --git a/java-parser/src/main/java/com/sono99/javaparser/impl/v1/converter/MethodDeclarationNodeConverterV1.java b/java-parser/src/main/java/com/sono99/javaparser/impl/v1/converter/MethodDeclarationNodeConverterV1.java
+new file mode 100644
+index 0000000..f8437d2
+--- /dev/null
++++ b/java-parser/src/main/java/com/sono99/javaparser/impl/v1/converter/MethodDeclarationNodeConverterV1.java
+@@ -0,0 +1,58 @@
++package com.sono99.javaparser.impl.v1.converter;
++
++import com.sono99.javaparser.api.v1.model.AbstractJavaNodeV1;
++import com.sono99.javaparser.api.v1.model.AnnotationNodeV1;
++import com.sono99.javaparser.api.v1.model.JavadocNodeV1;
++import com.sono99.javaparser.api.v1.model.MethodDeclarationNodeV1;
++import com.sono99.javaparser.impl.generic.model.MethodDeclarationNode;
++import com.sono99.javaparser.impl.v1.service.ConversionServiceV1;
++import com.sono99.javaparser.impl.v1.service.NodeConverterV1;
++import java.util.List;
++import java.util.stream.Collectors;
++import org.springframework.stereotype.Component;
++
++/**
++ * Converter to transform a generic {@link MethodDeclarationNode} to a {@link
++ * MethodDeclarationNodeV1}.
++ */
++@Component
++public class MethodDeclarationNodeConverterV1
++    implements NodeConverterV1<MethodDeclarationNode, MethodDeclarationNodeV1> {
++
++  @Override
++  public MethodDeclarationNodeV1 convert(
++      MethodDeclarationNode source, ConversionServiceV1 conversionService) {
++    @SuppressWarnings("unchecked")
++    List<AbstractJavaNodeV1<?>> children =
++        (List<AbstractJavaNodeV1<?>>)
++            (List<?>)
++                source.getChildren().stream()
++                    .map(child -> conversionService.convert(child, child.getClass()))
++                    .collect(Collectors.toList());
++
++    return new MethodDeclarationNodeV1(
++        source.getStartLine(),
++        source.getEndLine(),
++        source.getName(),
++        source.getSignature(),
++        source.getJavaChunk(),
++        source.getOriginalNode(),
++        source.getJavadoc() == null
++            ? null
++            : conversionService.convert(source.getJavadoc(), JavadocNodeV1.class),
++        source.getAnnotations().stream()
++            .map(annotation -> conversionService.convert(annotation, AnnotationNodeV1.class))
++            .toList(),
++        children);
++  }
++
++  @Override
++  public Class<MethodDeclarationNode> getSourceType() {
++    return MethodDeclarationNode.class;
++  }
++
++  @Override
++  public Class<MethodDeclarationNodeV1> getTargetType() {
++    return MethodDeclarationNodeV1.class;
++  }
++}
+diff --git a/java-parser/src/main/java/com/sono99/javaparser/impl/v1/converter/PackageDeclarationNodeConverterV1.java b/java-parser/src/main/java/com/sono99/javaparser/impl/v1/converter/PackageDeclarationNodeConverterV1.java
+new file mode 100644
+index 0000000..3e674e1
+--- /dev/null
++++ b/java-parser/src/main/java/com/sono99/javaparser/impl/v1/converter/PackageDeclarationNodeConverterV1.java
+@@ -0,0 +1,39 @@
++package com.sono99.javaparser.impl.v1.converter;
++
++import com.sono99.javaparser.api.v1.model.PackageDeclarationNodeV1;
++import com.sono99.javaparser.impl.generic.model.PackageDeclarationNode;
++import com.sono99.javaparser.impl.v1.service.ConversionServiceV1;
++import com.sono99.javaparser.impl.v1.service.NodeConverterV1;
++import java.util.Collections;
++import org.springframework.stereotype.Component;
++
++/**
++ * Converter to transform a generic {@link PackageDeclarationNode} to a {@link
++ * PackageDeclarationNodeV1}.
++ */
++@Component
++public class PackageDeclarationNodeConverterV1
++    implements NodeConverterV1<PackageDeclarationNode, PackageDeclarationNodeV1> {
++
++  @Override
++  public PackageDeclarationNodeV1 convert(
++      PackageDeclarationNode source, ConversionServiceV1 conversionService) {
++    return new PackageDeclarationNodeV1(
++        source.getStartLine(),
++        source.getEndLine(),
++        source.getPackageName(),
++        source.getJavaChunk(),
++        source.getOriginalNode(),
++        Collections.emptyList());
++  }
++
++  @Override
++  public Class<PackageDeclarationNode> getSourceType() {
++    return PackageDeclarationNode.class;
++  }
++
++  @Override
++  public Class<PackageDeclarationNodeV1> getTargetType() {
++    return PackageDeclarationNodeV1.class;
++  }
++}
+diff --git a/java-parser/src/main/java/com/sono99/javaparser/impl/v1/service/ConversionServiceV1.java b/java-parser/src/main/java/com/sono99/javaparser/impl/v1/service/ConversionServiceV1.java
+new file mode 100644
+index 0000000..13e6346
+--- /dev/null
++++ b/java-parser/src/main/java/com/sono99/javaparser/impl/v1/service/ConversionServiceV1.java
+@@ -0,0 +1,64 @@
++package com.sono99.javaparser.impl.v1.service;
++
++import java.util.HashMap;
++import java.util.List;
++import java.util.Map;
++import org.springframework.beans.factory.annotation.Autowired;
++import org.springframework.stereotype.Service;
++
++/**
++ * A service that manages and provides conversion between different node types. It discovers all
++ * {@link NodeConverterV1} beans and registers them for use.
++ */
++@Service
++public class ConversionServiceV1 {
++
++  private final Map<Class<?>, NodeConverterV1<?, ?>> converterRegistry = new HashMap<>();
++
++  /**
++   * Registers all {@link NodeConverterV1} beans found in the Spring context.
++   *
++   * @param converters the list of converters to register
++   */
++  @Autowired
++  public void registerConverters(List<NodeConverterV1<?, ?>> converters) {
++    converters.forEach(this::registerConverter);
++  }
++
++  private void registerConverter(NodeConverterV1<?, ?> converter) {
++    converterRegistry.put(converter.getSourceType(), converter);
++  }
++
++  /**
++   * Converts the given source object to the specified target type.
++   *
++   * @param source the source object to convert
++   * @param targetType the target type class
++   * @param <T> the source type
++   * @param <R> the target type
++   * @return the converted object
++   * @throws IllegalArgumentException if no converter is found for the source type
++   */
++  @SuppressWarnings("unchecked")
++  public <T, R> R convert(T source, Class<R> targetType) {
++    if (source == null) {
++      return null;
++    }
++    NodeConverterV1<T, R> converter =
++        (NodeConverterV1<T, R>) converterRegistry.get(source.getClass());
++    if (converter == null) {
++      // Try to find a converter for a superclass
++      for (Class<?> key : converterRegistry.keySet()) {
++        if (key.isInstance(source)) {
++          converter = (NodeConverterV1<T, R>) converterRegistry.get(key);
++          break;
++        }
++      }
++    }
++
++    if (converter == null) {
++      throw new IllegalArgumentException("No converter found for " + source.getClass());
++    }
++    return converter.convert(source, this);
++  }
++}
+diff --git a/java-parser/src/main/java/com/sono99/javaparser/impl/v1/service/JavaParsingServiceV1Impl.java b/java-parser/src/main/java/com/sono99/javaparser/impl/v1/service/JavaParsingServiceV1Impl.java
+new file mode 100644
+index 0000000..f09ade6
+--- /dev/null
++++ b/java-parser/src/main/java/com/sono99/javaparser/impl/v1/service/JavaParsingServiceV1Impl.java
+@@ -0,0 +1,42 @@
++package com.sono99.javaparser.impl.v1.service;
++
++import com.sono99.javaparser.api.v1.model.CompilationUnitNodeV1;
++import com.sono99.javaparser.api.v1.service.JavaParsingServiceV1;
++import com.sono99.javaparser.impl.generic.model.CompilationUnitNode;
++import com.sono99.javaparser.impl.generic.service.JavaParserService;
++import java.io.IOException;
++import java.io.InputStream;
++import java.nio.charset.StandardCharsets;
++import org.springframework.beans.factory.annotation.Autowired;
++import org.springframework.stereotype.Service;
++
++@Service
++public class JavaParsingServiceV1Impl implements JavaParsingServiceV1 {
++
++  @Autowired private JavaParserService genericService;
++  @Autowired private ConversionServiceV1 conversionService;
++
++  @Override
++  public CompilationUnitNodeV1 parse(InputStream source, String sourceName) {
++    try {
++      String sourceCode = new String(source.readAllBytes(), StandardCharsets.UTF_8);
++      return parseCompilationUnit(sourceCode, sourceName);
++    } catch (IOException e) {
++      throw new RuntimeException("Failed to read source from InputStream", e);
++    }
++  }
++
++  @Override
++  public CompilationUnitNodeV1 parseCompilationUnit(String source, String repositoryPath) {
++    CompilationUnitNode genericResult = genericService.parseCompilationUnit(source, repositoryPath);
++    return conversionService.convert(genericResult, CompilationUnitNodeV1.class);
++  }
++
++  @Override
++  public boolean canParse(InputStream source, String sourceName) {
++    if (sourceName != null && sourceName.endsWith(".java")) {
++      return true;
++    }
++    return false;
++  }
++}
+diff --git a/java-parser/src/main/java/com/sono99/javaparser/impl/v1/service/NodeConverterV1.java b/java-parser/src/main/java/com/sono99/javaparser/impl/v1/service/NodeConverterV1.java
+new file mode 100644
+index 0000000..29e89de
+--- /dev/null
++++ b/java-parser/src/main/java/com/sono99/javaparser/impl/v1/service/NodeConverterV1.java
+@@ -0,0 +1,34 @@
++package com.sono99.javaparser.impl.v1.service;
++
++/**
++ * Defines a generic interface for converting between different node types, typically from a generic
++ * model to a versioned API model.
++ *
++ * @param <T> the source type
++ * @param <R> the target type
++ */
++public interface NodeConverterV1<T, R> {
++
++  /**
++   * Converts the source object to the target type.
++   *
++   * @param source the source object to convert
++   * @param conversionService the conversion service for recursive conversions
++   * @return the converted object
++   */
++  R convert(T source, ConversionServiceV1 conversionService);
++
++  /**
++   * Returns the class of the source type.
++   *
++   * @return the source type class
++   */
++  Class<T> getSourceType();
++
++  /**
++   * Returns the class of the target type.
++   *
++   * @return the target type class
++   */
++  Class<R> getTargetType();
++}
+diff --git a/java-parser/src/test/java/com/sono99/javaparser/impl/generic/service/AbstractParseAnimalTest.java b/java-parser/src/test/java/com/sono99/javaparser/impl/generic/service/AbstractParseAnimalTest.java
+new file mode 100644
+index 0000000..ab56bee
+--- /dev/null
++++ b/java-parser/src/test/java/com/sono99/javaparser/impl/generic/service/AbstractParseAnimalTest.java
+@@ -0,0 +1,547 @@
++package com.sono99.javaparser.impl.generic.service;
++
++import static org.assertj.core.api.Assertions.assertThat;
++
++import com.github.javaparser.ast.CompilationUnit;
++import com.sono99.javaparser.impl.generic.model.ClassDeclarationNode;
++import com.sono99.javaparser.impl.generic.model.CompilationUnitNode;
++import com.sono99.javaparser.impl.generic.model.FieldDeclarationNode;
++import com.sono99.javaparser.impl.generic.model.ImportDeclarationNode;
++import com.sono99.javaparser.impl.generic.model.MethodDeclarationNode;
++import com.sono99.javaparser.impl.generic.model.PackageDeclarationNode;
++import java.io.ByteArrayInputStream;
++import java.io.IOException;
++import java.nio.file.Files;
++import java.nio.file.Path;
++import java.util.List;
++import org.junit.jupiter.api.Test;
++
++/**
++ * Abstract base class containing core test logic for JavaParserService testing. Provides common
++ * test methods that can be used by both unit tests (manual instantiation) and integration tests
++ * (Spring context). Eliminates code duplication while supporting both fast unit tests and
++ * comprehensive integration tests.
++ *
++ * <p>Subclasses must implement {@link #createParserService()} to provide the appropriate service
++ * instance for their testing strategy.
++ */
++abstract class AbstractParseAnimalTest {
++
++  /**
++   * Creates and configures a JavaParserService instance for testing. Unit tests should return
++   * manually instantiated service, while integration tests should return Spring-injected service.
++   *
++   * @return configured JavaParserService ready for testing
++   */
++  protected abstract JavaParserService createParserService();
++
++  /**
++   * Test that the JavaParserService correctly parses a complex Java source file and creates a valid
++   * CompilationUnitNode with proper line ranges and source content. Ensures the parser foundation
++   * is solid before adding child node population.
++   *
++   * <p>Validates comprehensive AST structure including package declarations, imports, class
++   * declarations with annotations, field declarations with Javadoc, and method declarations. Tests
++   * the hierarchical parent-child relationships created by the DFS parsing approach.
++   */
++  @Test
++  void shouldParseAnimalJavaFile() throws IOException {
++    // Given: Load the Animal.java test file and create parser service
++    String repositoryPath = "src/main/java/com/example/animals/Animal.java";
++    Path animalFile = Path.of("src/test/resources/example_classes/Animal.java");
++    String sourceContent = Files.readString(animalFile);
++    JavaParserService parserService = createParserService();
++
++    // When: Parse the source using the configured service
++    CompilationUnitNode result =
++        parserService.parseCompilationUnit(
++            new ByteArrayInputStream(sourceContent.getBytes()), repositoryPath);
++
++    // Then: Validate basic CompilationUnitNode properties
++    assertThat(result).isNotNull();
++    assertThat(result.getRepositoryPath()).isEqualTo(repositoryPath);
++    assertThat(result.getJavaChunk()).isEqualTo(sourceContent);
++    assertThat(result.getStartLine()).isEqualTo(1);
++    assertThat(result.getEndLine()).isEqualTo(69);
++
++    // Should have children: 1 package + 6 imports + 1 class
++    assertThat(result.getChildren()).hasSize(8);
++
++    // Validate specific package declaration
++    PackageDeclarationNode packageNode = result.getPackageDeclaration();
++    assertThat(packageNode).isNotNull();
++    assertThat(packageNode.getPackageName()).isEqualTo("com.example.animals");
++    assertThat(packageNode.getJavaChunk()).isEqualTo("package com.example.animals;");
++
++    // Validate specific imports
++    List<ImportDeclarationNode> importNodes = result.getImportDeclarations();
++    assertThat(importNodes).hasSize(6);
++
++    // Check for specific imports
++    assertThat(
++            importNodes.stream()
++                .anyMatch(imp -> imp.getImportName().equals("jakarta.persistence.Entity")))
++        .isTrue();
++    assertThat(
++            importNodes.stream()
++                .anyMatch(
++                    imp -> imp.getImportName().equals("jakarta.validation.constraints.AssertTrue")))
++        .isTrue();
++
++    // Validate the class declaration
++    ClassDeclarationNode classNode =
++        result.getChildren().stream()
++            .filter(ClassDeclarationNode.class::isInstance)
++            .map(ClassDeclarationNode.class::cast)
++            .findFirst()
++            .orElse(null);
++
++    assertThat(classNode).isNotNull();
++    assertThat(classNode.getName()).isEqualTo("Animal");
++
++    // Validate class-level Javadoc extraction
++    assertThat(classNode.getJavadoc()).isNotNull();
++    assertThat(classNode.getJavadoc().getJavaChunk())
++        .contains("/**")
++        .contains("Represents a generic animal entity in the system.")
++        .contains("This class is intended as a base type for specific animal implementations.");
++
++    // Validate line range behavior: getRange() includes class annotations
++    // This is CORRECT JavaParser behavior - annotations are part of class declaration
++    assertThat(classNode.getStartLine()).isEqualTo(14); // Starts at @Entity (correct)
++    assertThat(classNode.getEndLine()).isEqualTo(69); // Ends at closing brace
++
++    // Validate javaChunk contains the complete annotated class declaration
++    assertThat(classNode.getJavaChunk())
++        .contains("@Entity") // Class annotation
++        .contains("@Table(name = \"animals\")") // Table annotation
++        .contains("@Inheritance(strategy = InheritanceType.SINGLE_TABLE)") // Inheritance annotation
++        .contains("public class Animal") // Class declaration
++        .contains("private long id;") // Field
++        .contains("private String animalTypeName;") // Another field
++        .contains("@AssertTrue") // Method annotation
++        .contains("public boolean isAnimalTypeValid()") // Method declaration
++        .endsWith("}"); // Class closing brace
++
++    // Current implementation: annotations in javaChunk but not parsed to AnnotationNode yet
++    assertThat(classNode.getAnnotations()).isEmpty(); // No structured annotations yet
++
++    // With DFS approach, fields and methods are correctly children of the class
++    assertThat(classNode.getChildren()).isNotEmpty(); // Now has field and method children
++    assertThat(classNode.getChildren()).hasSize(6); // 2 fields + 4 methods
++
++    // Validate that we have the expected field and method children
++    long fieldCount =
++        classNode.getChildren().stream()
++            .filter(child -> child instanceof FieldDeclarationNode)
++            .count();
++    long methodCount =
++        classNode.getChildren().stream()
++            .filter(child -> child instanceof MethodDeclarationNode)
++            .count();
++
++    assertThat(fieldCount).isEqualTo(2); // id and animalTypeName fields
++    assertThat(methodCount).isEqualTo(4); // 4 methods in Animal class
++
++    // Validate field names and content
++    List<FieldDeclarationNode> fields =
++        classNode.getChildren().stream()
++            .filter(FieldDeclarationNode.class::isInstance)
++            .map(FieldDeclarationNode.class::cast)
++            .toList();
++
++    assertThat(fields).hasSize(2);
++
++    // Validate first field (id) - includes @Id annotation
++    FieldDeclarationNode idField =
++        fields.stream().filter(f -> "id".equals(f.getName())).findFirst().orElse(null);
++    assertThat(idField).isNotNull();
++    assertThat(idField.getName()).isEqualTo("id");
++    assertThat(idField.getType()).isEqualTo("long");
++    assertThat(idField.getJavaChunk()).contains("@Id");
++    assertThat(idField.getJavaChunk()).contains("private long id;");
++
++    // Validate field-level Javadoc extraction for id field
++    assertThat(idField.getJavadoc()).isNotNull();
++    assertThat(idField.getJavadoc().getJavaChunk())
++        .contains("/**")
++        .contains("Primary key identifier for the animal.");
++
++    // Validate second field (animalTypeName) - no annotations but has indentation
++    FieldDeclarationNode animalTypeField =
++        fields.stream().filter(f -> "animalTypeName".equals(f.getName())).findFirst().orElse(null);
++    assertThat(animalTypeField).isNotNull();
++    assertThat(animalTypeField.getName()).isEqualTo("animalTypeName");
++    assertThat(animalTypeField.getType()).isEqualTo("String");
++    assertThat(animalTypeField.getJavaChunk()).contains("private String animalTypeName;");
++
++    // Validate field-level Javadoc extraction for animalTypeName field
++    assertThat(animalTypeField.getJavadoc()).isNotNull();
++    assertThat(animalTypeField.getJavadoc().getJavaChunk())
++        .contains("/**")
++        .contains("Describes the type of animal, e.g., \"Cat\", \"Shark\", etc.");
++
++    // Validate method signatures and content
++    List<MethodDeclarationNode> methods =
++        classNode.getChildren().stream()
++            .filter(MethodDeclarationNode.class::isInstance)
++            .map(MethodDeclarationNode.class::cast)
++            .toList();
++
++    assertThat(methods).hasSize(4);
++
++    // Validate isAnimalTypeValid method
++    MethodDeclarationNode validationMethod =
++        methods.stream()
++            .filter(m -> "isAnimalTypeValid".equals(m.getName()))
++            .findFirst()
++            .orElse(null);
++    assertThat(validationMethod).isNotNull();
++    assertThat(validationMethod.getName()).isEqualTo("isAnimalTypeValid");
++    assertThat(validationMethod.getSignature()).isEqualTo("isAnimalTypeValid()");
++    assertThat(validationMethod.getJavaChunk()).contains("@AssertTrue");
++    assertThat(validationMethod.getJavaChunk()).contains("public boolean isAnimalTypeValid()");
++
++    // Validate method-level Javadoc extraction for isAnimalTypeValid method
++    assertThat(validationMethod.getJavadoc()).isNotNull();
++    assertThat(validationMethod.getJavadoc().getJavaChunk())
++        .contains("/**")
++        .contains("Validates that the animal type name contains no digits.");
++
++    // Validate parent relationships
++    assertThat(result.getParent()).isNull();
++    assertThat(classNode.getParent()).isSameAs(result);
++
++    // Validate overall import statistics (assuming 6 imports)
++    assertThat(importNodes).hasSize(6);
++  }
++
++  /**
++   * Test that the new node reference functionality works correctly. Verifies that we can access the
++   * original JavaParser AST nodes for enhanced information access.
++   *
++   * <p>Tests the bridge between our custom AST model and the original JavaParser AST nodes,
++   * ensuring that enhanced information from the GitHub parser is accessible when needed.
++   */
++  @Test
++  void shouldProvideAccessToOriginalJavaParserNodes() throws IOException {
++    // Given: Load the Animal.java test file and create parser service
++    JavaParserService parserService = createParserService();
++    Path animalFile = Path.of("src/test/resources/example_classes/Animal.java");
++    String sourceContent = Files.readString(animalFile);
++    String repositoryPath = "src/main/java/com/example/animals/Animal.java";
++
++    // When: Parse the source using our service
++    CompilationUnitNode result =
++        parserService.parseCompilationUnit(
++            new ByteArrayInputStream(sourceContent.getBytes()), repositoryPath);
++
++    // Then: Verify we can access the original JavaParser CompilationUnit
++    assertThat(result.getOriginalNode()).isNotNull();
++    assertThat(result.getOriginalNode())
++        .isInstanceOf(com.github.javaparser.ast.CompilationUnit.class);
++
++    // Verify package declaration node has access to original PackageDeclaration
++    PackageDeclarationNode packageNode = result.getPackageDeclaration();
++    assertThat(packageNode).isNotNull();
++    assertThat(packageNode.getOriginalNode()).isNotNull();
++    assertThat(packageNode.getOriginalNode())
++        .isInstanceOf(com.github.javaparser.ast.PackageDeclaration.class);
++
++    // Verify import declaration nodes have access to original ImportDeclaration
++    List<ImportDeclarationNode> importNodes = result.getImportDeclarations();
++    assertThat(importNodes).isNotEmpty();
++    for (ImportDeclarationNode importNode : importNodes) {
++      assertThat(importNode.getOriginalNode()).isNotNull();
++      assertThat(importNode.getOriginalNode())
++          .isInstanceOf(com.github.javaparser.ast.ImportDeclaration.class);
++    }
++
++    // Verify class declaration node has access to original TypeDeclaration
++    ClassDeclarationNode classNode = result.getClassDeclarations().get(0);
++    assertThat(classNode).isNotNull();
++    assertThat(classNode.getOriginalNode()).isNotNull();
++    assertThat(classNode.getOriginalNode())
++        .isInstanceOf(com.github.javaparser.ast.body.TypeDeclaration.class);
++
++    // Verify that we can extract additional information from the original nodes
++    // For example, get the class modifiers from the original TypeDeclaration
++    com.github.javaparser.ast.body.TypeDeclaration<?> originalTypeDecl =
++        (com.github.javaparser.ast.body.TypeDeclaration<?>) classNode.getOriginalNode();
++    assertThat(originalTypeDecl.getModifiers()).isNotEmpty();
++
++    // Verify that the original CompilationUnit contains the expected types
++    com.github.javaparser.ast.CompilationUnit originalCu =
++        (com.github.javaparser.ast.CompilationUnit) result.getOriginalNode();
++    assertThat(originalCu.getTypes()).hasSize(1); // One class in Animal.java
++    assertThat(originalCu.getTypes().get(0).getNameAsString()).isEqualTo("Animal");
++  }
++
++  /**
++   * Test that the JavaParserService correctly handles minimal but valid Java source code. Ensures
++   * the parser can handle edge cases with small compilation units before expanding to complex
++   * scenarios.
++   *
++   * <p>Validates basic parsing functionality with the simplest possible valid Java source, ensuring
++   * the parser doesn't have assumptions about complexity requirements.
++   */
++  @Test
++  void shouldParseMinimalJavaFile() {
++    // Given: Minimal valid Java source
++    String minimalJava =
++        """
++            package test;
++            public class Test {
++            }
++            """;
++    String repositoryPath = "src/test/java/test/Test.java";
++    JavaParserService parserService = createParserService();
++
++    // When: Parse the minimal source using the configured service
++    CompilationUnitNode result =
++        parserService.parseCompilationUnit(
++            new ByteArrayInputStream(minimalJava.getBytes()), repositoryPath);
++
++    // Then: Basic validation
++    assertThat(result).isNotNull();
++    assertThat(result.getRepositoryPath()).isEqualTo(repositoryPath);
++    assertThat(result.getJavaChunk()).isEqualTo(minimalJava);
++    assertThat(result.getStartLine()).isEqualTo(1);
++    assertThat(result.getEndLine()).isEqualTo(3);
++
++    assertThat(result.getChildren()).hasSize(2); // Has 1 package declaration + 1 class
++    assertThat(result.getParent()).isNull();
++
++    PackageDeclarationNode packageNode = result.getPackageDeclaration();
++    assertThat(packageNode).isNotNull();
++    assertThat(packageNode.getPackageName()).isEqualTo("test");
++    assertThat(packageNode.getJavaChunk()).isEqualTo("package test;");
++
++    ClassDeclarationNode classNode = result.getClassDeclarations().get(0);
++    assertThat(classNode).isNotNull();
++    assertThat(classNode.getName()).isEqualTo("Test");
++  }
++
++  /**
++   * Test comprehensive Javadoc extraction for classes, fields, and methods. Validates that Javadoc
++   * comments are properly extracted and associated with their respective elements.
++   *
++   * <p>Ensures that Javadoc comments are correctly positioned relative to their associated elements
++   * and that the content is properly extracted for LLM processing and documentation generation
++   * purposes.
++   */
++  @Test
++  void shouldExtractJavadocCommentsCorrectly() throws IOException {
++    // Given: Load the Animal.java test file which has comprehensive Javadoc
++    String repositoryPath = "src/main/java/com/example/animals/Animal.java";
++    Path animalFile = Path.of("src/test/resources/example_classes/Animal.java");
++    String sourceContent = Files.readString(animalFile);
++    JavaParserService parserService = createParserService();
++
++    // When: Parse and extract the class node
++    CompilationUnitNode result =
++        parserService.parseCompilationUnit(
++            new ByteArrayInputStream(sourceContent.getBytes()), repositoryPath);
++    ClassDeclarationNode classNode = result.getClassDeclarations().get(0);
++
++    // Then: Validate class-level Javadoc extraction
++    assertThat(classNode.getJavadoc()).isNotNull();
++    assertThat(classNode.getJavadoc().getJavaChunk())
++        .contains("/**")
++        .contains("Represents a generic animal entity in the system.")
++        .contains("This class is intended as a base type for specific animal implementations.")
++        .contains("*/");
++
++    // Validate class-level Javadoc positioning
++    assertThat(classNode.getJavadoc().getStartLine()).isEqualTo(10); // Line before @Entity
++    assertThat(classNode.getJavadoc().getEndLine()).isEqualTo(13); // End of Javadoc
++
++    // Validate field-level Javadoc extraction
++    List<FieldDeclarationNode> fields =
++        classNode.getChildren().stream()
++            .filter(FieldDeclarationNode.class::isInstance)
++            .map(FieldDeclarationNode.class::cast)
++            .toList();
++
++    // Validate id field Javadoc
++    FieldDeclarationNode idField =
++        fields.stream().filter(f -> "id".equals(f.getName())).findFirst().orElse(null);
++    assertThat(idField).isNotNull();
++    assertThat(idField.getJavadoc()).isNotNull();
++    assertThat(idField.getJavadoc().getJavaChunk())
++        .contains("/**")
++        .contains("Primary key identifier for the animal.")
++        .contains("*/");
++
++    // Validate animalTypeName field Javadoc
++    FieldDeclarationNode animalTypeField =
++        fields.stream().filter(f -> "animalTypeName".equals(f.getName())).findFirst().orElse(null);
++    assertThat(animalTypeField).isNotNull();
++    assertThat(animalTypeField.getJavadoc()).isNotNull();
++    assertThat(animalTypeField.getJavadoc().getJavaChunk())
++        .contains("/**")
++        .contains("Describes the type of animal, e.g., \"Cat\", \"Shark\", etc.")
++        .contains("*/");
++
++    // Validate method-level Javadoc extraction
++    List<MethodDeclarationNode> methods =
++        classNode.getChildren().stream()
++            .filter(MethodDeclarationNode.class::isInstance)
++            .map(MethodDeclarationNode.class::cast)
++            .toList();
++
++    // Validate isAnimalTypeValid method Javadoc
++    MethodDeclarationNode validationMethod =
++        methods.stream()
++            .filter(m -> "isAnimalTypeValid".equals(m.getName()))
++            .findFirst()
++            .orElse(null);
++    assertThat(validationMethod).isNotNull();
++    assertThat(validationMethod.getJavadoc()).isNotNull();
++    assertThat(validationMethod.getJavadoc().getJavaChunk())
++        .contains("/**")
++        .contains("Validates that the animal type name contains no digits.")
++        .contains("@return true if the name has no numbers")
++        .contains("*/");
++
++    // Validate that all methods in Animal.java have Javadoc (all 4 methods have Javadoc)
++    List<MethodDeclarationNode> methodsWithJavadoc =
++        methods.stream().filter(m -> m.getJavadoc() != null).toList();
++    assertThat(methodsWithJavadoc).hasSize(4); // All methods in Animal.java have Javadoc
++
++    // Validate Javadoc positioning relative to elements
++    assertThat(classNode.getJavadoc().getEndLine() + 1).isEqualTo(classNode.getStartLine());
++    assertThat(idField.getJavadoc().getEndLine() + 1).isEqualTo(idField.getStartLine());
++    assertThat(validationMethod.getJavadoc().getEndLine() + 1)
++        .isEqualTo(validationMethod.getStartLine());
++
++    // Validate that Javadoc nodes have access to original JavaParser nodes
++    assertThat(classNode.getJavadoc().getOriginalNode()).isNotNull();
++    assertThat(classNode.getJavadoc().getOriginalNode())
++        .isInstanceOf(com.github.javaparser.ast.comments.JavadocComment.class);
++
++    assertThat(idField.getJavadoc().getOriginalNode()).isNotNull();
++    assertThat(idField.getJavadoc().getOriginalNode())
++        .isInstanceOf(com.github.javaparser.ast.comments.JavadocComment.class);
++
++    assertThat(validationMethod.getJavadoc().getOriginalNode()).isNotNull();
++    assertThat(validationMethod.getJavadoc().getOriginalNode())
++        .isInstanceOf(com.github.javaparser.ast.comments.JavadocComment.class);
++  }
++
++  /**
++   * Test that the new parseGitHubCompilationUnit API works correctly. Validates that the method
++   * returns a non-null CompilationUnit result. Ensures the convenience API for advanced AST
++   * processing is functional.
++   *
++   * <p>This test validates the bridge API that provides direct access to the GitHub parser AST for
++   * advanced use cases requiring the full power of the JavaParser library.
++   */
++  @Test
++  void shouldParseGitHubCompilationUnitSuccessfully() throws IOException {
++    // Given: Load the Animal.java test file and create parser service
++    JavaParserService parserService = createParserService();
++    Path animalFile = Path.of("src/test/resources/example_classes/Animal.java");
++    String sourceContent = Files.readString(animalFile);
++    String repositoryPath = "src/main/java/com/example/animals/Animal.java";
++
++    // When: Parse the source using the new GitHub parser API
++    CompilationUnit result =
++        parserService.parseGitHubCompilationUnit(
++            new ByteArrayInputStream(sourceContent.getBytes()), repositoryPath);
++
++    // Then: Verify the result is not null (trust GitHub parser correctness)
++    assertThat(result).isNotNull();
++    assertThat(result).isInstanceOf(CompilationUnit.class);
++
++    // Verify that we can access basic information from the raw CompilationUnit
++    assertThat(result.getTypes()).isNotEmpty(); // Should have at least one type (Animal class)
++    assertThat(result.getTypes().get(0).getNameAsString()).isEqualTo("Animal");
++  }
++
++  // === Helper Methods ===
++
++  /**
++   * Helper method to parse a test file from resources.
++   *
++   * @param fileName name of the test file in resources
++   * @param repositoryPath repository path for the file
++   * @return parsed CompilationUnitNode
++   * @throws IOException if file cannot be read
++   */
++  protected CompilationUnitNode parseFile(String fileName, String repositoryPath)
++      throws IOException {
++    Path filePath = Path.of("src/test/resources/example_classes/" + fileName);
++    String sourceContent = Files.readString(filePath);
++    JavaParserService parserService = createParserService();
++    return parserService.parseCompilationUnit(
++        new ByteArrayInputStream(sourceContent.getBytes()), repositoryPath);
++  }
++
++  /**
++   * Validates basic properties of a CompilationUnitNode.
++   *
++   * @param result the parsed CompilationUnitNode
++   * @param expectedSource the expected source content
++   * @param expectedRepositoryPath the expected repository path
++   */
++  protected void validateBasicProperties(
++      CompilationUnitNode result, String expectedSource, String expectedRepositoryPath) {
++    assertThat(result).isNotNull();
++    assertThat(result.getRepositoryPath()).isEqualTo(expectedRepositoryPath);
++    assertThat(result.getJavaChunk()).isEqualTo(expectedSource);
++    assertThat(result.getStartLine()).isEqualTo(1);
++  }
++
++  /**
++   * Asserts that a package declaration exists with the expected content.
++   *
++   * @param result the CompilationUnitNode to check
++   * @param expectedPackageDeclaration the expected package declaration string
++   */
++  protected void assertPackageDeclaration(
++      CompilationUnitNode result, String expectedPackageDeclaration) {
++    PackageDeclarationNode packageNode = result.getPackageDeclaration();
++    assertThat(packageNode).isNotNull();
++    assertThat(packageNode.getJavaChunk()).isEqualTo(expectedPackageDeclaration);
++  }
++
++  /**
++   * Asserts that an import exists in the children list.
++   *
++   * @param children the list of child nodes
++   * @param importName the name of the import to find
++   * @param isStatic whether the import should be static
++   * @param isAsterisk whether the import should be an asterisk import
++   */
++  protected void assertImportExists(
++      List<com.sono99.javaparser.impl.generic.model.AbstractJavaNode<?>> children,
++      String importName,
++      boolean isStatic,
++      boolean isAsterisk) {
++    assertThat(
++            children.stream()
++                .anyMatch(
++                    child -> {
++                      if (child instanceof ImportDeclarationNode importNode) {
++                        return importNode.getImportName().equals(importName)
++                            && importNode.isStatic() == isStatic
++                            && importNode.isAsterisk() == isAsterisk;
++                      }
++                      return false;
++                    }))
++        .isTrue();
++  }
++
++  /**
++   * Validates overall import statistics.
++   *
++   * @param children the list of child nodes to analyze
++   */
++  protected void assertImportStatistics(
++      List<com.sono99.javaparser.impl.generic.model.AbstractJavaNode<?>> children) {
++    long importCount =
++        children.stream().filter(child -> child instanceof ImportDeclarationNode).count();
++    assertThat(importCount).isEqualTo(6); // Expected number of imports in Animal.java
++  }
++}
+diff --git a/java-parser/src/test/java/com/sono99/javaparser/impl/generic/service/ParseAnimalIntegrationTest.java b/java-parser/src/test/java/com/sono99/javaparser/impl/generic/service/ParseAnimalIntegrationTest.java
+new file mode 100644
+index 0000000..c8eae37
+--- /dev/null
++++ b/java-parser/src/test/java/com/sono99/javaparser/impl/generic/service/ParseAnimalIntegrationTest.java
+@@ -0,0 +1,72 @@
++package com.sono99.javaparser.impl.generic.service;
++
++import static org.assertj.core.api.Assertions.assertThat;
++
++import com.sono99.javaparser.impl.generic.utils.SourceContentUtils;
++import org.junit.jupiter.api.Test;
++import org.springframework.beans.factory.annotation.Autowired;
++import org.springframework.boot.test.context.SpringBootTest;
++import org.springframework.test.context.ContextConfiguration;
++
++/**
++ * Integration tests for JavaParserService using real Spring context. Tests the service as it would
++ * be used in production with proper dependency injection. Validates that Spring can correctly wire
++ * and configure the parser service.
++ *
++ * <p>Extends AbstractParseAnimalTest to inherit all core test logic while providing Spring-specific
++ * testing capabilities and configuration validation.
++ */
++@SpringBootTest
++@ContextConfiguration(classes = {JavaParserService.class, SourceContentUtils.class})
++class ParseAnimalIntegrationTest extends AbstractParseAnimalTest {
++
++  @Autowired private JavaParserService parserService;
++
++  /**
++   * Creates a JavaParserService instance using Spring dependency injection. Returns the
++   * Spring-injected service for integration testing.
++   *
++   * @return Spring-managed JavaParserService instance
++   */
++  @Override
++  protected JavaParserService createParserService() {
++    return parserService;
++  }
++
++  /**
++   * Test that verifies Spring properly injected the JavaParserService. Ensures that the @Autowired
++   * annotation works correctly and the service is properly configured by Spring's dependency
++   * injection container.
++   */
++  @Test
++  void shouldVerifySpringInjectionWorks() {
++    // Verify that Spring properly injected the service
++    assertThat(parserService).isNotNull();
++  }
++
++  /**
++   * Test that validates the SourceContentUtils dependency is correctly injected by Spring. Uses
++   * reflection to access the private field and verify Spring's dependency injection worked
++   * correctly for the service's internal dependencies.
++   */
++  @Test
++  void shouldVerifySourceContentUtilsInjectedIntoService() {
++    // This test verifies that the SourceContentUtils dependency is correctly
++    // injected into JavaParserService by Spring.
++    // Since SourceContentUtils is a private field in JavaParserService,
++    // we'll use reflection to access it and assert its non-null status.
++    try {
++      java.lang.reflect.Field sourceUtilsField =
++          JavaParserService.class.getDeclaredField("sourceUtils");
++      sourceUtilsField.setAccessible(true);
++      SourceContentUtils sourceContentUtils =
++          (SourceContentUtils) sourceUtilsField.get(parserService);
++      assertThat(sourceContentUtils).isNotNull();
++    } catch (NoSuchFieldException | IllegalAccessException e) {
++      throw new RuntimeException("Failed to access sourceUtils field via reflection", e);
++    }
++  }
++
++  // remaining tests found in the parent class
++
++}
+diff --git a/java-parser/src/test/java/com/sono99/javaparser/impl/generic/service/ParseAnimalTest.java b/java-parser/src/test/java/com/sono99/javaparser/impl/generic/service/ParseAnimalTest.java
+index 1c9a0f1..3b652d6 100644
+--- a/java-parser/src/test/java/com/sono99/javaparser/impl/generic/service/ParseAnimalTest.java
++++ b/java-parser/src/test/java/com/sono99/javaparser/impl/generic/service/ParseAnimalTest.java
+@@ -1,418 +1,32 @@
+ package com.sono99.javaparser.impl.generic.service;
+ 
+-import static org.assertj.core.api.Assertions.assertThat;
+-
+-import com.github.javaparser.ast.CompilationUnit;
+-import com.sono99.javaparser.impl.generic.model.ClassDeclarationNode;
+-import com.sono99.javaparser.impl.generic.model.CompilationUnitNode;
+-import com.sono99.javaparser.impl.generic.model.FieldDeclarationNode;
+-import com.sono99.javaparser.impl.generic.model.ImportDeclarationNode;
+-import com.sono99.javaparser.impl.generic.model.MethodDeclarationNode;
+-import com.sono99.javaparser.impl.generic.model.PackageDeclarationNode;
+ import com.sono99.javaparser.impl.generic.utils.SourceContentUtils;
+-import java.io.ByteArrayInputStream;
+-import java.io.IOException;
+-import java.nio.file.Files;
+-import java.nio.file.Path;
+-import java.util.List;
+-import org.junit.jupiter.api.Test;
+ 
+ /**
+- * Test parsing of Java files into CompilationUnitNode ASTs with granular validation of package and
+- * import children. Validates specific content and structure rather than just counts.
++ * Fast unit tests for JavaParserService using manual instantiation and dependency injection. Tests
++ * the service behavior in isolation without Spring context overhead for rapid development and
++ * debugging. Extends AbstractParseAnimalTest to share test logic while providing fast unit-level
++ * testing capabilities.
++ *
++ * <p>Uses manual service instantiation and setter injection for maximum speed and control during
++ * development and debugging scenarios.
+  */
+-class ParseAnimalTest extends AbstractJavaParserTest {
++class ParseAnimalTest extends AbstractParseAnimalTest {
+ 
+   /**
+-   * Test that the JavaParserService2 correctly parses a complex Java source file and creates a
+-   * valid CompilationUnitNode with proper line ranges and source content. Ensures the parser
+-   * foundation is solid before adding child node population.
++   * Creates a JavaParserService instance using manual instantiation for fast unit testing. Manually
++   * injects SourceContentUtils dependency to avoid Spring context overhead.
++   *
++   * @return manually configured JavaParserService for unit testing
+    */
+-  @Test
+-  void shouldParseAnimalJavaFile() throws IOException {
+-    // Given: Load the Animal.java test file
+-    String repositoryPath = "src/main/java/com/example/animals/Animal.java";
+-    CompilationUnitNode result = parseFile("Animal.java", repositoryPath);
+-    String sourceContent =
+-        Files.readString(Path.of("src/test/resources/example_classes/Animal.java"));
+-
+-    // Then: Validate basic CompilationUnitNode properties using common method
+-    validateBasicProperties(result, sourceContent, repositoryPath);
+-
+-    // Should have children: 1 package + 6 imports + 1 class
+-    assertThat(result.getChildren()).hasSize(8);
+-
+-    // Validate specific package declaration using common method
+-    assertPackageDeclaration(result, "package com.example.animals;");
+-
+-    // Validate specific imports using common method
+-    assertImportExists(result.getChildren(), "jakarta.persistence.Entity", false, false);
+-    assertImportExists(
+-        result.getChildren(), "jakarta.validation.constraints.AssertTrue", false, false);
+-
+-    // Validate class declaration is now included
+-    assertThat(result.getChildren()).hasSize(8); // 1 package + 6 imports + 1 class
+-
+-    // Validate the class declaration
+-    ClassDeclarationNode classNode =
+-        result.getChildren().stream()
+-            .filter(ClassDeclarationNode.class::isInstance)
+-            .map(ClassDeclarationNode.class::cast)
+-            .findFirst()
+-            .orElse(null);
+-
+-    assertThat(classNode).isNotNull();
+-    assertThat(classNode.getName()).isEqualTo("Animal");
+-
+-    // Validate class-level Javadoc extraction
+-    assertThat(classNode.getJavadoc()).isNotNull();
+-    assertThat(classNode.getJavadoc().getJavaChunk())
+-        .contains("/**")
+-        .contains("Represents a generic animal entity in the system.")
+-        .contains("This class is intended as a base type for specific animal implementations.");
+-
+-    // Validate line range behavior: getRange() includes class annotations
+-    // This is CORRECT JavaParser behavior - annotations are part of class
+-    // declaration
+-    assertThat(classNode.getStartLine()).isEqualTo(14); // Starts at @Entity (correct)
+-    assertThat(classNode.getEndLine()).isEqualTo(69); // Ends at closing brace
+-
+-    // Validate javaChunk contains the complete annotated class declaration
+-    assertThat(classNode.getJavaChunk())
+-        .contains("@Entity") // Class annotation
+-        .contains("@Table(name = \"animals\")") // Table annotation
+-        .contains("@Inheritance(strategy = InheritanceType.SINGLE_TABLE)") // Inheritance
+-        // annotation
+-        .contains("public class Animal") // Class declaration
+-        .contains("private long id;") // Field
+-        .contains("private String animalTypeName;") // Another field
+-        .contains("@AssertTrue") // Method annotation
+-        .contains("public boolean isAnimalTypeValid()") // Method declaration
+-        .endsWith("}"); // Class closing brace
+-
+-    // Current implementation: annotations in javaChunk but not parsed to
+-    // AnnotationNode yet (Step A)
+-    assertThat(classNode.getAnnotations()).isEmpty(); // Step A - no structured annotations yet
+-
+-    // With DFS approach, fields and methods are correctly children of the class
+-    assertThat(classNode.getChildren()).isNotEmpty(); // Now has field and method children
+-    assertThat(classNode.getChildren()).hasSize(6); // 2 fields + 4 methods
+-
+-    // Validate that we have the expected field and method children
+-    long fieldCount =
+-        classNode.getChildren().stream()
+-            .filter(child -> child instanceof FieldDeclarationNode)
+-            .count();
+-    long methodCount =
+-        classNode.getChildren().stream()
+-            .filter(child -> child instanceof MethodDeclarationNode)
+-            .count();
+-
+-    assertThat(fieldCount).isEqualTo(2); // id and animalTypeName fields
+-    assertThat(methodCount).isEqualTo(4); // 4 methods in Animal class
+-
+-    // Validate field names and content
+-    List<FieldDeclarationNode> fields =
+-        classNode.getChildren().stream()
+-            .filter(FieldDeclarationNode.class::isInstance)
+-            .map(FieldDeclarationNode.class::cast)
+-            .toList();
+-
+-    assertThat(fields).hasSize(2);
+-
+-    // Validate first field (id) - includes @Id annotation
+-    FieldDeclarationNode idField =
+-        fields.stream().filter(f -> "id".equals(f.getName())).findFirst().orElse(null);
+-    assertThat(idField).isNotNull();
+-    assertThat(idField.getName()).isEqualTo("id");
+-    assertThat(idField.getType()).isEqualTo("long");
+-    assertThat(idField.getJavaChunk()).contains("@Id");
+-    assertThat(idField.getJavaChunk()).contains("private long id;");
+-
+-    // Validate field-level Javadoc extraction for id field
+-    assertThat(idField.getJavadoc()).isNotNull();
+-    assertThat(idField.getJavadoc().getJavaChunk())
+-        .contains("/**")
+-        .contains("Primary key identifier for the animal.");
+-
+-    // Validate second field (animalTypeName) - no annotations but has indentation
+-    FieldDeclarationNode animalTypeField =
+-        fields.stream().filter(f -> "animalTypeName".equals(f.getName())).findFirst().orElse(null);
+-    assertThat(animalTypeField).isNotNull();
+-    assertThat(animalTypeField.getName()).isEqualTo("animalTypeName");
+-    assertThat(animalTypeField.getType()).isEqualTo("String");
+-    assertThat(animalTypeField.getJavaChunk()).contains("private String animalTypeName;");
+-
+-    // Validate field-level Javadoc extraction for animalTypeName field
+-    assertThat(animalTypeField.getJavadoc()).isNotNull();
+-    assertThat(animalTypeField.getJavadoc().getJavaChunk())
+-        .contains("/**")
+-        .contains("Describes the type of animal, e.g., \"Cat\", \"Shark\", etc.");
+-
+-    // Validate method signatures and content
+-    List<MethodDeclarationNode> methods =
+-        classNode.getChildren().stream()
+-            .filter(MethodDeclarationNode.class::isInstance)
+-            .map(MethodDeclarationNode.class::cast)
+-            .toList();
+-
+-    assertThat(methods).hasSize(4);
+-
+-    // Validate isAnimalTypeValid method
+-    MethodDeclarationNode validationMethod =
+-        methods.stream()
+-            .filter(m -> "isAnimalTypeValid".equals(m.getName()))
+-            .findFirst()
+-            .orElse(null);
+-    assertThat(validationMethod).isNotNull();
+-    assertThat(validationMethod.getName()).isEqualTo("isAnimalTypeValid");
+-    assertThat(validationMethod.getSignature()).isEqualTo("isAnimalTypeValid()");
+-    assertThat(validationMethod.getJavaChunk()).contains("@AssertTrue");
+-    assertThat(validationMethod.getJavaChunk()).contains("public boolean isAnimalTypeValid()");
+-
+-    // Validate method-level Javadoc extraction for isAnimalTypeValid method
+-    assertThat(validationMethod.getJavadoc()).isNotNull();
+-    assertThat(validationMethod.getJavadoc().getJavaChunk())
+-        .contains("/**")
+-        .contains("Validates that the animal type name contains no digits.");
+-
+-    // Validate parent relationships
+-    assertThat(result.getParent()).isNull();
+-    assertThat(classNode.getParent()).isSameAs(result);
+-
+-    // Document expected behavior: JavaParser getRange() includes annotations and
+-    // javadoc
+-    // This provides complete context for LLM processing while keeping Step A
+-    // implementation simple
+-
+-    // Validate overall import statistics
+-    assertImportStatistics(result.getChildren());
+-  }
+-
+-  /**
+-   * Test that the new node reference functionality works correctly. Verifies that we can access the
+-   * original JavaParser AST nodes for enhanced information access.
+-   */
+-  @Test
+-  void shouldProvideAccessToOriginalJavaParserNodes() throws IOException {
+-    // Given: Load the Animal.java test file and create parser service
++  @Override
++  protected JavaParserService createParserService() {
+     JavaParserService parserService = new JavaParserService();
+     SourceContentUtils utils = new SourceContentUtils();
+     parserService.setSourceUtils(utils);
+-    Path animalFile = Path.of("src/test/resources/example_classes/Animal.java");
+-    String sourceContent = Files.readString(animalFile);
+-    String repositoryPath = "src/main/java/com/example/animals/Animal.java";
+-
+-    // When: Parse the source using our service
+-    CompilationUnitNode result =
+-        parserService.parseCompilationUnit(
+-            new ByteArrayInputStream(sourceContent.getBytes()), repositoryPath);
+-
+-    // Then: Verify we can access the original JavaParser CompilationUnit
+-    assertThat(result.getOriginalNode()).isNotNull();
+-    assertThat(result.getOriginalNode())
+-        .isInstanceOf(com.github.javaparser.ast.CompilationUnit.class);
+-
+-    // Verify package declaration node has access to original PackageDeclaration
+-    PackageDeclarationNode packageNode = result.getPackageDeclaration();
+-    assertThat(packageNode).isNotNull();
+-    assertThat(packageNode.getOriginalNode()).isNotNull();
+-    assertThat(packageNode.getOriginalNode())
+-        .isInstanceOf(com.github.javaparser.ast.PackageDeclaration.class);
+-
+-    // Verify import declaration nodes have access to original ImportDeclaration
+-    List<ImportDeclarationNode> importNodes = result.getImportDeclarations();
+-    assertThat(importNodes).isNotEmpty();
+-    for (ImportDeclarationNode importNode : importNodes) {
+-      assertThat(importNode.getOriginalNode()).isNotNull();
+-      assertThat(importNode.getOriginalNode())
+-          .isInstanceOf(com.github.javaparser.ast.ImportDeclaration.class);
+-    }
+-
+-    // Verify class declaration node has access to original TypeDeclaration
+-    ClassDeclarationNode classNode = result.getClassDeclarations().get(0);
+-    assertThat(classNode).isNotNull();
+-    assertThat(classNode.getOriginalNode()).isNotNull();
+-    assertThat(classNode.getOriginalNode())
+-        .isInstanceOf(com.github.javaparser.ast.body.TypeDeclaration.class);
+-
+-    // Verify that we can extract additional information from the original nodes
+-    // For example, get the class modifiers from the original TypeDeclaration
+-    com.github.javaparser.ast.body.TypeDeclaration<?> originalTypeDecl =
+-        classNode.getOriginalNode();
+-    assertThat(originalTypeDecl.getModifiers()).isNotEmpty();
+-
+-    // Verify that the original CompilationUnit contains the expected types
+-    com.github.javaparser.ast.CompilationUnit originalCu = result.getOriginalNode();
+-    assertThat(originalCu.getTypes()).hasSize(1); // One class in Animal.java
+-    assertThat(originalCu.getTypes().get(0).getNameAsString()).isEqualTo("Animal");
+-  }
+-
+-  /**
+-   * Test that the JavaParserService correctly handles minimal but valid Java source code. Ensures
+-   * the parser can handle edge cases with small compilation units before expanding to complex
+-   * scenarios.
+-   */
+-  @Test
+-  void shouldParseMinimalJavaFile() {
+-    // Given: Minimal valid Java source
+-    String minimalJava =
+-        """
+-                                package test;
+-                                public class Test {
+-                                }
+-                                """;
+-    String repositoryPath = "src/test/java/test/Test.java";
+-
+-    // When: Parse the minimal source using common method
+-    CompilationUnitNode result =
+-        createParserService()
+-            .parseCompilationUnit(new ByteArrayInputStream(minimalJava.getBytes()), repositoryPath);
+-
+-    // Then: Basic validation using common method
+-    validateBasicProperties(result, minimalJava, repositoryPath);
+-    assertThat(result.getChildren()).hasSize(2); // Has 1 package declaration + 1 class
+-    assertThat(result.getParent()).isNull();
++    return parserService;
+   }
+ 
+-  /**
+-   * Test comprehensive Javadoc extraction for classes, fields, and methods. Validates that Javadoc
+-   * comments are properly extracted and associated with their respective elements.
+-   */
+-  @Test
+-  void shouldExtractJavadocCommentsCorrectly() throws IOException {
+-    // Given: Load the Animal.java test file which has comprehensive Javadoc
+-    String repositoryPath = "src/main/java/com/example/animals/Animal.java";
+-    CompilationUnitNode result = parseFile("Animal.java", repositoryPath);
+-
+-    // When: Extract the class node
+-    ClassDeclarationNode classNode = result.getClassDeclarations().get(0);
+-
+-    // Then: Validate class-level Javadoc extraction
+-    assertThat(classNode.getJavadoc()).isNotNull();
+-    assertThat(classNode.getJavadoc().getJavaChunk())
+-        .contains("/**")
+-        .contains("Represents a generic animal entity in the system.")
+-        .contains("This class is intended as a base type for specific animal implementations.")
+-        .contains("*/");
+-
+-    // Validate class-level Javadoc positioning
+-    assertThat(classNode.getJavadoc().getStartLine()).isEqualTo(10); // Line before @Entity
+-    assertThat(classNode.getJavadoc().getEndLine()).isEqualTo(13); // End of Javadoc
+-
+-    // Validate field-level Javadoc extraction
+-    List<FieldDeclarationNode> fields =
+-        classNode.getChildren().stream()
+-            .filter(FieldDeclarationNode.class::isInstance)
+-            .map(FieldDeclarationNode.class::cast)
+-            .toList();
+-
+-    // Validate id field Javadoc
+-    FieldDeclarationNode idField =
+-        fields.stream().filter(f -> "id".equals(f.getName())).findFirst().orElse(null);
+-    assertThat(idField).isNotNull();
+-    assertThat(idField.getJavadoc()).isNotNull();
+-    assertThat(idField.getJavadoc().getJavaChunk())
+-        .contains("/**")
+-        .contains("Primary key identifier for the animal.")
+-        .contains("*/");
+-
+-    // Validate animalTypeName field Javadoc
+-    FieldDeclarationNode animalTypeField =
+-        fields.stream().filter(f -> "animalTypeName".equals(f.getName())).findFirst().orElse(null);
+-    assertThat(animalTypeField).isNotNull();
+-    assertThat(animalTypeField.getJavadoc()).isNotNull();
+-    assertThat(animalTypeField.getJavadoc().getJavaChunk())
+-        .contains("/**")
+-        .contains("Describes the type of animal, e.g., \"Cat\", \"Shark\", etc.")
+-        .contains("*/");
++  // Tests are found in the parent class
+ 
+-    // Validate method-level Javadoc extraction
+-    List<MethodDeclarationNode> methods =
+-        classNode.getChildren().stream()
+-            .filter(MethodDeclarationNode.class::isInstance)
+-            .map(MethodDeclarationNode.class::cast)
+-            .toList();
+-
+-    // Validate isAnimalTypeValid method Javadoc
+-    MethodDeclarationNode validationMethod =
+-        methods.stream()
+-            .filter(m -> "isAnimalTypeValid".equals(m.getName()))
+-            .findFirst()
+-            .orElse(null);
+-    assertThat(validationMethod).isNotNull();
+-    assertThat(validationMethod.getJavadoc()).isNotNull();
+-    assertThat(validationMethod.getJavadoc().getJavaChunk())
+-        .contains("/**")
+-        .contains("Validates that the animal type name contains no digits.")
+-        .contains("@return true if the name has no numbers")
+-        .contains("*/");
+-
+-    // Validate that all methods in Animal.java have Javadoc (all 4 methods have
+-    // Javadoc)
+-    List<MethodDeclarationNode> methodsWithJavadoc =
+-        methods.stream().filter(m -> m.getJavadoc() != null).toList();
+-    assertThat(methodsWithJavadoc).hasSize(4); // All methods in Animal.java have Javadoc
+-
+-    // Validate Javadoc positioning relative to elements
+-    assertThat(classNode.getJavadoc().getEndLine() + 1)
+-        .isEqualTo(classNode.getStartLine()); // Javadoc ends
+-    // right
+-    // before class
+-    // starts
+-    assertThat(idField.getJavadoc().getEndLine() + 1)
+-        .isEqualTo(idField.getStartLine()); // Javadoc ends
+-    // right
+-    // before field
+-    // starts
+-    assertThat(validationMethod.getJavadoc().getEndLine() + 1)
+-        .isEqualTo(validationMethod.getStartLine()); // Javadoc
+-    // ends
+-    // right
+-    // before
+-    // method
+-    // starts
+-
+-    // Validate that Javadoc nodes have access to original JavaParser nodes
+-    assertThat(classNode.getJavadoc().getOriginalNode()).isNotNull();
+-    assertThat(classNode.getJavadoc().getOriginalNode())
+-        .isInstanceOf(com.github.javaparser.ast.comments.JavadocComment.class);
+-
+-    assertThat(idField.getJavadoc().getOriginalNode()).isNotNull();
+-    assertThat(idField.getJavadoc().getOriginalNode())
+-        .isInstanceOf(com.github.javaparser.ast.comments.JavadocComment.class);
+-
+-    assertThat(validationMethod.getJavadoc().getOriginalNode()).isNotNull();
+-    assertThat(validationMethod.getJavadoc().getOriginalNode())
+-        .isInstanceOf(com.github.javaparser.ast.comments.JavadocComment.class);
+-  }
+-
+-  /**
+-   * Test that the new parseGitHubCompilationUnit API works correctly. Validates that the method
+-   * returns a non-null CompilationUnit result. Ensures the convenience API for advanced AST
+-   * processing is functional.
+-   */
+-  @Test
+-  void shouldParseGitHubCompilationUnitSuccessfully() throws IOException {
+-    // Given: Load the Animal.java test file and create parser service
+-    JavaParserService parserService = new JavaParserService();
+-    SourceContentUtils utils = new SourceContentUtils();
+-    parserService.setSourceUtils(utils);
+-    Path animalFile = Path.of("src/test/resources/example_classes/Animal.java");
+-    String sourceContent = Files.readString(animalFile);
+-    String repositoryPath = "src/main/java/com/example/animals/Animal.java";
+-
+-    // When: Parse the source using the new GitHub parser API
+-    CompilationUnit result =
+-        parserService.parseGitHubCompilationUnit(
+-            new ByteArrayInputStream(sourceContent.getBytes()), repositoryPath);
+-
+-    // Then: Verify the result is not null (trust GitHub parser correctness)
+-    assertThat(result).isNotNull();
+-    assertThat(result).isInstanceOf(CompilationUnit.class);
+-
+-    // Verify that we can access basic information from the raw CompilationUnit
+-    assertThat(result.getTypes()).isNotEmpty(); // Should have at least one type (Animal class)
+-    assertThat(result.getTypes().get(0).getNameAsString()).isEqualTo("Animal");
+-  }
+ }
+diff --git a/java-parser/src/test/java/com/sono99/javaparser/impl/v1/service/ConversionServiceV1Test.java b/java-parser/src/test/java/com/sono99/javaparser/impl/v1/service/ConversionServiceV1Test.java
+new file mode 100644
+index 0000000..90c01a7
+--- /dev/null
++++ b/java-parser/src/test/java/com/sono99/javaparser/impl/v1/service/ConversionServiceV1Test.java
+@@ -0,0 +1,350 @@
++package com.sono99.javaparser.impl.v1.service;
++
++import static org.assertj.core.api.Assertions.assertThat;
++
++import com.sono99.javaparser.api.v1.model.ClassDeclarationNodeV1;
++import com.sono99.javaparser.api.v1.model.CompilationUnitNodeV1;
++import com.sono99.javaparser.api.v1.model.FieldDeclarationNodeV1;
++import com.sono99.javaparser.api.v1.model.ImportDeclarationNodeV1;
++import com.sono99.javaparser.api.v1.model.MethodDeclarationNodeV1;
++import com.sono99.javaparser.api.v1.model.PackageDeclarationNodeV1;
++import com.sono99.javaparser.impl.generic.model.CompilationUnitNode;
++import com.sono99.javaparser.impl.generic.service.JavaParserService;
++import com.sono99.javaparser.impl.generic.utils.SourceContentUtils;
++import com.sono99.javaparser.impl.v1.converter.AnnotationNodeConverterV1;
++import com.sono99.javaparser.impl.v1.converter.ClassDeclarationNodeConverterV1;
++import com.sono99.javaparser.impl.v1.converter.CompilationUnitNodeConverterV1;
++import com.sono99.javaparser.impl.v1.converter.FieldDeclarationNodeConverterV1;
++import com.sono99.javaparser.impl.v1.converter.ImportDeclarationNodeConverterV1;
++import com.sono99.javaparser.impl.v1.converter.JavadocNodeConverterV1;
++import com.sono99.javaparser.impl.v1.converter.MethodDeclarationNodeConverterV1;
++import com.sono99.javaparser.impl.v1.converter.PackageDeclarationNodeConverterV1;
++import java.io.ByteArrayInputStream;
++import java.io.IOException;
++import java.nio.file.Files;
++import java.nio.file.Path;
++import java.util.List;
++import org.junit.jupiter.api.Test;
++import org.springframework.beans.factory.annotation.Autowired;
++import org.springframework.boot.test.context.SpringBootTest;
++import org.springframework.test.context.ContextConfiguration;
++
++/**
++ * Integration tests for ConversionServiceV1. Tests the complete pipeline from generic parsing to v1
++ * API conversion. Validates that the conversion service correctly transforms generic AST nodes to
++ * versioned API nodes while preserving all essential information.
++ *
++ * <p>Uses black-box testing approach: parses with generic JavaParserService, then converts to v1
++ * API using ConversionServiceV1, validating the end-to-end conversion quality.
++ */
++@SpringBootTest
++@ContextConfiguration(
++    classes = {
++      JavaParserService.class,
++      ConversionServiceV1.class,
++      SourceContentUtils.class,
++      // All converter classes need to be explicitly listed for Spring to discover them
++      AnnotationNodeConverterV1.class,
++      ClassDeclarationNodeConverterV1.class,
++      CompilationUnitNodeConverterV1.class,
++      FieldDeclarationNodeConverterV1.class,
++      ImportDeclarationNodeConverterV1.class,
++      JavadocNodeConverterV1.class,
++      MethodDeclarationNodeConverterV1.class,
++      PackageDeclarationNodeConverterV1.class,
++    })
++class ConversionServiceV1Test {
++
++  @Autowired private JavaParserService genericParser;
++  @Autowired private ConversionServiceV1 conversionService;
++
++  /**
++   * Test that verifies the complete conversion pipeline works correctly. Parses Animal.java using
++   * the generic parser, converts to v1 API, and validates that all structures are properly
++   * transformed while preserving essential information like line numbers, content, and hierarchy.
++   *
++   * <p>Validates comprehensive AST structure conversion including package declarations, imports,
++   * class declarations with Javadoc, field declarations, and method declarations.
++   */
++  @Test
++  void shouldConvertAnimalJavaFileSuccessfully() throws IOException {
++    // Given: Load the Animal.java test file and set up services
++    String repositoryPath = "src/main/java/com/example/animals/Animal.java";
++    Path animalFile = Path.of("src/test/resources/example_classes/Animal.java");
++    String sourceContent = Files.readString(animalFile);
++
++    // When: Parse with generic service and convert to v1
++    CompilationUnitNode genericResult =
++        genericParser.parseCompilationUnit(
++            new ByteArrayInputStream(sourceContent.getBytes()), repositoryPath);
++
++    CompilationUnitNodeV1 v1Result =
++        conversionService.convert(genericResult, CompilationUnitNodeV1.class);
++
++    // Then: Validate basic conversion success
++    assertThat(v1Result).isNotNull();
++    assertThat(v1Result.getRepositoryPath()).isEqualTo(repositoryPath);
++    assertThat(v1Result.getJavaChunk()).isEqualTo(sourceContent);
++    assertThat(v1Result.getStartLine()).isEqualTo(1);
++    assertThat(v1Result.getEndLine()).isEqualTo(69);
++
++    // Should have children: 1 package + 6 imports + 1 class
++    assertThat(v1Result.getChildren()).hasSize(8);
++
++    // Validate specific package declaration conversion
++    PackageDeclarationNodeV1 packageNode = v1Result.getPackageDeclaration();
++    assertThat(packageNode).isNotNull();
++    assertThat(packageNode.getPackageName()).isEqualTo("com.example.animals");
++    assertThat(packageNode.getJavaChunk()).isEqualTo("package com.example.animals;");
++
++    // Validate specific imports conversion
++    List<ImportDeclarationNodeV1> importNodes = v1Result.getImportDeclarations();
++    assertThat(importNodes).hasSize(6);
++
++    // Check for specific imports
++    assertThat(
++            importNodes.stream()
++                .anyMatch(imp -> imp.getImportName().equals("jakarta.persistence.Entity")))
++        .isTrue();
++    assertThat(
++            importNodes.stream()
++                .anyMatch(
++                    imp -> imp.getImportName().equals("jakarta.validation.constraints.AssertTrue")))
++        .isTrue();
++
++    // Validate the class declaration conversion
++    ClassDeclarationNodeV1 classNode = v1Result.getClassDeclarations().get(0);
++    assertThat(classNode).isNotNull();
++    assertThat(classNode.getName()).isEqualTo("Animal");
++
++    // Validate class-level Javadoc conversion
++    assertThat(classNode.getJavadoc()).isNotNull();
++    assertThat(classNode.getJavadoc().javaCodeChunk())
++        .contains("/**")
++        .contains("Represents a generic animal entity in the system.")
++        .contains("This class is intended as a base type for specific animal implementations.");
++
++    // Validate line range behavior
++    assertThat(classNode.getStartLine()).isEqualTo(14); // Starts at @Entity
++    assertThat(classNode.getEndLine()).isEqualTo(69); // Ends at closing brace
++
++    // Validate javaChunk contains the complete annotated class declaration
++    assertThat(classNode.getJavaChunk())
++        .contains("@Entity")
++        .contains("@Table(name = \"animals\")")
++        .contains("@Inheritance(strategy = InheritanceType.SINGLE_TABLE)")
++        .contains("public class Animal")
++        .contains("private long id;")
++        .contains("private String animalTypeName;")
++        .contains("@AssertTrue")
++        .contains("public boolean isAnimalTypeValid()")
++        .endsWith("}");
++
++    // Validate that we have the expected field and method children
++    assertThat(classNode.getChildren()).isNotEmpty();
++    assertThat(classNode.getChildren()).hasSize(6); // 2 fields + 4 methods
++
++    // Validate field conversion
++    List<FieldDeclarationNodeV1> fields = classNode.getFieldDeclarations();
++    assertThat(fields).hasSize(2);
++
++    // Validate first field (id) conversion
++    FieldDeclarationNodeV1 idField =
++        fields.stream().filter(f -> "id".equals(f.getName())).findFirst().orElse(null);
++    assertThat(idField).isNotNull();
++    assertThat(idField.getName()).isEqualTo("id");
++    assertThat(idField.getType()).isEqualTo("long");
++    assertThat(idField.getJavaChunk()).contains("@Id");
++    assertThat(idField.getJavaChunk()).contains("private long id;");
++
++    // Validate field-level Javadoc conversion for id field
++    assertThat(idField.getJavadoc()).isNotNull();
++    assertThat(idField.getJavadoc().javaCodeChunk())
++        .contains("/**")
++        .contains("Primary key identifier for the animal.");
++
++    // Validate second field (animalTypeName) conversion
++    FieldDeclarationNodeV1 animalTypeField =
++        fields.stream().filter(f -> "animalTypeName".equals(f.getName())).findFirst().orElse(null);
++    assertThat(animalTypeField).isNotNull();
++    assertThat(animalTypeField.getName()).isEqualTo("animalTypeName");
++    assertThat(animalTypeField.getType()).isEqualTo("String");
++    assertThat(animalTypeField.getJavaChunk()).contains("private String animalTypeName;");
++
++    // Validate method conversion
++    List<MethodDeclarationNodeV1> methods = classNode.getMethodDeclarations();
++    assertThat(methods).hasSize(4);
++
++    // Validate isAnimalTypeValid method conversion
++    MethodDeclarationNodeV1 validationMethod =
++        methods.stream()
++            .filter(m -> "isAnimalTypeValid".equals(m.getName()))
++            .findFirst()
++            .orElse(null);
++    assertThat(validationMethod).isNotNull();
++    assertThat(validationMethod.getName()).isEqualTo("isAnimalTypeValid");
++    assertThat(validationMethod.getSignature()).isEqualTo("isAnimalTypeValid()");
++    assertThat(validationMethod.getJavaChunk()).contains("@AssertTrue");
++    assertThat(validationMethod.getJavaChunk()).contains("public boolean isAnimalTypeValid()");
++
++    // Validate method-level Javadoc conversion
++    assertThat(validationMethod.getJavadoc()).isNotNull();
++    assertThat(validationMethod.getJavadoc().javaCodeChunk())
++        .contains("/**")
++        .contains("Validates that the animal type name contains no digits.");
++
++    // Validate that all methods in Animal.java have Javadoc (all 4 methods have Javadoc)
++    List<MethodDeclarationNodeV1> methodsWithJavadoc =
++        methods.stream().filter(m -> m.getJavadoc() != null).toList();
++    assertThat(methodsWithJavadoc).hasSize(4);
++
++    // Validate hierarchical relationships are preserved
++    assertThat(v1Result.getChildren()).isNotEmpty();
++    assertThat(classNode.getChildren()).isNotEmpty();
++
++    // Validate overall import statistics
++    assertThat(importNodes).hasSize(6);
++  }
++
++  /**
++   * Test that validates conversion of a minimal Java file. Ensures the conversion service can
++   * handle simple cases before expanding to complex scenarios.
++   */
++  @Test
++  void shouldConvertMinimalJavaFileSuccessfully() {
++    // Given: Minimal valid Java source
++    String minimalJava =
++        """
++                package test;
++                public class Test {
++                }
++                """;
++    String repositoryPath = "src/test/java/test/Test.java";
++
++    // When: Parse with generic service and convert to v1
++    CompilationUnitNode genericResult =
++        genericParser.parseCompilationUnit(
++            new ByteArrayInputStream(minimalJava.getBytes()), repositoryPath);
++
++    CompilationUnitNodeV1 v1Result =
++        conversionService.convert(genericResult, CompilationUnitNodeV1.class);
++
++    // Then: Basic validation
++    assertThat(v1Result).isNotNull();
++    assertThat(v1Result.getRepositoryPath()).isEqualTo(repositoryPath);
++    assertThat(v1Result.getJavaChunk()).isEqualTo(minimalJava);
++    assertThat(v1Result.getStartLine()).isEqualTo(1);
++    assertThat(v1Result.getEndLine()).isEqualTo(3);
++
++    assertThat(v1Result.getChildren()).hasSize(2); // Has 1 package declaration + 1 class
++
++    PackageDeclarationNodeV1 packageNode = v1Result.getPackageDeclaration();
++    assertThat(packageNode).isNotNull();
++    assertThat(packageNode.getPackageName()).isEqualTo("test");
++    assertThat(packageNode.getJavaChunk()).isEqualTo("package test;");
++
++    ClassDeclarationNodeV1 classNode = v1Result.getClassDeclarations().get(0);
++    assertThat(classNode).isNotNull();
++    assertThat(classNode.getName()).isEqualTo("Test");
++  }
++
++  /**
++   * Test that validates Javadoc conversion across all node types. Ensures that Javadoc comments are
++   * properly converted from generic nodes to v1 API nodes.
++   */
++  @Test
++  void shouldConvertJavadocCommentsCorrectly() throws IOException {
++    // Given: Load the Animal.java test file which has comprehensive Javadoc
++    String repositoryPath = "src/main/java/com/example/animals/Animal.java";
++    Path animalFile = Path.of("src/test/resources/example_classes/Animal.java");
++    String sourceContent = Files.readString(animalFile);
++
++    // When: Parse and convert to v1
++    CompilationUnitNode genericResult =
++        genericParser.parseCompilationUnit(
++            new ByteArrayInputStream(sourceContent.getBytes()), repositoryPath);
++
++    CompilationUnitNodeV1 v1Result =
++        conversionService.convert(genericResult, CompilationUnitNodeV1.class);
++
++    ClassDeclarationNodeV1 classNode = v1Result.getClassDeclarations().get(0);
++
++    // Then: Validate class-level Javadoc conversion
++    assertThat(classNode.getJavadoc()).isNotNull();
++    assertThat(classNode.getJavadoc().javaCodeChunk())
++        .contains("/**")
++        .contains("Represents a generic animal entity in the system.")
++        .contains("This class is intended as a base type for specific animal implementations.")
++        .contains("*/");
++
++    // Validate field-level Javadoc conversion
++    List<FieldDeclarationNodeV1> fields = classNode.getFieldDeclarations();
++
++    // Validate id field Javadoc conversion
++    FieldDeclarationNodeV1 idField =
++        fields.stream().filter(f -> "id".equals(f.getName())).findFirst().orElse(null);
++    assertThat(idField).isNotNull();
++    assertThat(idField.getJavadoc()).isNotNull();
++    assertThat(idField.getJavadoc().javaCodeChunk())
++        .contains("/**")
++        .contains("Primary key identifier for the animal.");
++
++    // Validate method-level Javadoc conversion
++    List<MethodDeclarationNodeV1> methods = classNode.getMethodDeclarations();
++
++    // Validate isAnimalTypeValid method Javadoc conversion
++    MethodDeclarationNodeV1 validationMethod =
++        methods.stream()
++            .filter(m -> "isAnimalTypeValid".equals(m.getName()))
++            .findFirst()
++            .orElse(null);
++    assertThat(validationMethod).isNotNull();
++    assertThat(validationMethod.getJavadoc()).isNotNull();
++    assertThat(validationMethod.getJavadoc().javaCodeChunk())
++        .contains("/**")
++        .contains("Validates that the animal type name contains no digits.");
++  }
++
++  /**
++   * Test that validates the conversion service handles edge cases gracefully. Ensures that the
++   * conversion process is robust and doesn't fail on unusual but valid Java structures.
++   */
++  @Test
++  void shouldHandleConversionEdgeCases() throws IOException {
++    // Given: Load a more complex test file
++    String repositoryPath = "src/main/java/com/example/animals/ClassWithInnerClass.java";
++    Path testFile = Path.of("src/test/resources/example_classes/ClassWithInnerClass.java");
++    String sourceContent = Files.readString(testFile);
++
++    // When: Parse with generic service and convert to v1
++    CompilationUnitNode genericResult =
++        genericParser.parseCompilationUnit(
++            new ByteArrayInputStream(sourceContent.getBytes()), repositoryPath);
++
++    CompilationUnitNodeV1 v1Result =
++        conversionService.convert(genericResult, CompilationUnitNodeV1.class);
++
++    // Then: Verify conversion succeeded even with complex structures
++    assertThat(v1Result).isNotNull();
++    assertThat(v1Result.getChildren()).isNotEmpty();
++
++    // Should have at least one class
++    assertThat(v1Result.getClassDeclarations()).isNotEmpty();
++
++    // Validate that the conversion preserved the structure
++    ClassDeclarationNodeV1 mainClass = v1Result.getClassDeclarations().get(0);
++    assertThat(mainClass).isNotNull();
++    assertThat(mainClass.getChildren()).isNotEmpty(); // Should have inner class or other members
++  }
++
++  /**
++   * Test that verifies Spring properly injected both services. Ensures that the @Autowired
++   * annotations work correctly for both the generic parser and conversion service.
++   */
++  @Test
++  void shouldVerifySpringInjectionWorks() {
++    // Verify that Spring properly injected both services
++    assertThat(genericParser).isNotNull();
++    assertThat(conversionService).isNotNull();
++  }
++}
+diff --git a/pom.xml b/pom.xml
+index eae41b7..6f03657 100644
+--- a/pom.xml
++++ b/pom.xml
+@@ -1,8 +1,7 @@
+ <?xml version="1.0" encoding="UTF-8"?>
+ <project xmlns="http://maven.apache.org/POM/4.0.0"
+-         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0
+-         http://maven.apache.org/xsd/maven-4.0.0.xsd">
++    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
++    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+     <modelVersion>4.0.0</modelVersion>
+ 
+     <groupId>com.sono99</groupId>
+@@ -20,14 +19,20 @@
+         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+ 
+         <!-- Dependency versions -->
+-        <spring-boot.version>3.3.0</spring-boot.version>
+-        <javaparser.version>3.25.8</javaparser.version>
+-        <github-api.version>1.323</github-api.version>
+-        <langchain4j.version>0.34.0</langchain4j.version>
+-        <junit.version>5.10.2</junit.version>
+-        <mockito.version>5.11.0</mockito.version>
+-        <assertj.version>3.25.3</assertj.version>
+-        <gson.version>2.10.1</gson.version>
++        <spring-boot.version>3.3.4</spring-boot.version>
++        <javaparser.version>3.26.1</javaparser.version>
++        <github-api.version>1.326</github-api.version>
++        <langchain4j.version>0.35.0</langchain4j.version>
++        <junit.version>5.11.0</junit.version>
++        <mockito.version>5.12.0</mockito.version>
++        <assertj.version>3.26.0</assertj.version>
++        <gson.version>2.11.0</gson.version>
++
++        <!-- Plugin versions -->
++        <maven-checkstyle-plugin.version>3.4.0</maven-checkstyle-plugin.version>
++        <spotless-maven-plugin.version>2.44.0</spotless-maven-plugin.version>
++        <maven-surefire-plugin.version>3.3.0</maven-surefire-plugin.version>
++        <maven-compiler-plugin.version>3.12.1</maven-compiler-plugin.version>
+     </properties>
+ 
+     <modules>
+@@ -119,7 +124,7 @@
+                 <plugin>
+                     <groupId>org.apache.maven.plugins</groupId>
+                     <artifactId>maven-compiler-plugin</artifactId>
+-                    <version>3.11.0</version>
++                    <version>${maven-compiler-plugin.version}</version>
+                     <configuration>
+                         <source>21</source>
+                         <target>21</target>
+@@ -128,11 +133,29 @@
+                 <plugin>
+                     <groupId>org.apache.maven.plugins</groupId>
+                     <artifactId>maven-surefire-plugin</artifactId>
+-                    <version>3.2.5</version>
++                    <version>${maven-surefire-plugin.version}</version>
+                     <configuration>
+                         <useModulePath>false</useModulePath>
+                     </configuration>
+                 </plugin>
++                <plugin>
++                    <groupId>org.apache.maven.plugins</groupId>
++                    <artifactId>maven-enforcer-plugin</artifactId>
++                    <version>3.4.1</version> <!-- Using a recent stable version -->
++                    <executions>
++                        <execution>
++                            <id>enforce</id>
++                            <goals>
++                                <goal>enforce</goal>
++                            </goals>
++                            <configuration>
++                                <rules>
++                                    <dependencyConvergence />
++                                </rules>
++                            </configuration>
++                        </execution>
++                    </executions>
++                </plugin>
+             </plugins>
+         </pluginManagement>
+ 
+@@ -140,8 +163,8 @@
+             <plugin>
+                 <groupId>org.apache.maven.plugins</groupId>
+                 <artifactId>maven-checkstyle-plugin</artifactId>
+-                <version>3.3.1</version>
+-                <!-- disable check style temporarily for the project to go forward and build. -->
++                <version>${maven-checkstyle-plugin.version}</version>                <!-- disable check style temporarily for the project to go
++                forward and build. -->
+                 <executions>
+                     <execution>
+                         <id>validate</id>
+@@ -165,7 +188,7 @@
+             <plugin>
+                 <groupId>com.diffplug.spotless</groupId>
+                 <artifactId>spotless-maven-plugin</artifactId>
+-                <version>2.43.0</version>
++                <version>${spotless-maven-plugin.version}</version>
+                 <configuration>
+                     <java>
+                         <googleJavaFormat>
+@@ -185,4 +208,4 @@
+             </plugin>
+         </plugins>
+     </build>
+-</project>
++</project>
+\ No newline at end of file
+diff --git a/scripts/03_gemini_cli_with_flash.sh b/scripts/03_gemini_cli_with_flash.sh
+new file mode 100755
+index 0000000..a909bd1
+--- /dev/null
++++ b/scripts/03_gemini_cli_with_flash.sh
+@@ -0,0 +1 @@
++gemini -m gemini-2.5-flash
+\ No newline at end of file

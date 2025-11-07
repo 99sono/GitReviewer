@@ -1,5 +1,5 @@
 {
-    "java.configuration.updateBuildConfiguration": "interactive",
+    "java.configuration.updateBuildConfiguration": "automatic",
     "java.compile.nullAnalysis.mode": "disabled",
     "java.format.organizeImports": true,
     "java.format.onType": true,
@@ -10,5 +10,6 @@
     "editor.formatOnSave": true,
     "[java]": {
         "editor.defaultFormatter": "mmilic.java-google-format"
-    }
+    },
+    "java.search.scope": "all"
 }
