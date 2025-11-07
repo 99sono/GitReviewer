@@ -2,7 +2,9 @@ package com.sono99.diffparser.impl.generic.model;
 
 import com.github.difflib.patch.Chunk;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Represents a contiguous range of lines within a diff, typically corresponding to either the
@@ -115,5 +117,29 @@ public record LineRange(
    */
   public List<Integer> getChangedLineNumbers() {
     return new ArrayList<>(originalGitHubChunk.getChangePosition());
+  }
+
+  /**
+   * Returns a map where the key is a 1-based line number that has changed within this chunk, and
+   * the value is the corresponding line content.
+   *
+   * <p>This method combines the information from {@link #getChangedLineNumbers()} and {@link
+   * #originalGitHubChunk} to provide a direct mapping of changed line numbers to their actual
+   * content.
+   *
+   * @return A map of 1-based changed line numbers to their content.
+   */
+  public Map<Integer, String> getChangedLineNumberToLineContentMap() {
+    Map<Integer, String> changedLinesMap = new HashMap<>();
+    List<String> chunkLines = originalGitHubChunk.getLines();
+    int startLine = getStartLine();
+
+    for (Integer changedLineNumber : getChangedLineNumbers()) {
+      int chunkIndex = changedLineNumber - startLine;
+      if (chunkIndex >= 0 && chunkIndex < chunkLines.size()) {
+        changedLinesMap.put(changedLineNumber, chunkLines.get(chunkIndex));
+      }
+    }
+    return changedLinesMap;
   }
 }

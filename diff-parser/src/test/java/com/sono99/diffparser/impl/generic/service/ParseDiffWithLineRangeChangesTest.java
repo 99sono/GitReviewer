@@ -10,6 +10,7 @@ import com.sono99.diffparser.impl.generic.model.DiffedFile;
 import com.sono99.diffparser.impl.generic.model.ParsedDiff;
 import com.sono99.diffparser.impl.utils.BasicTestHelper;
 import java.io.IOException;
+import java.util.Map;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -69,5 +70,24 @@ class ParseDiffWithLineRangeChangesTest {
     assertEquals(2, diffChunk.targetLineRange().getChangedLineNumbers().size());
     assertTrue(diffChunk.targetLineRange().getChangedLineNumbers().contains(45));
     assertTrue(diffChunk.targetLineRange().getChangedLineNumbers().contains(50));
+
+    // Validate changed line number to line content map for target chunk (first validation)
+    Map<Integer, String> targetChangedLinesMap =
+        diffChunk.targetLineRange().getChangedLineNumberToLineContentMap();
+    assertNotNull(targetChangedLinesMap);
+    assertEquals(2, targetChangedLinesMap.size());
+    assertEquals(
+        "      // added a dummy line at line number 45 of this file.",
+        targetChangedLinesMap.get(45));
+    assertEquals(
+        "      // (b) Convert to our domain model (dummy modification line 50)",
+        targetChangedLinesMap.get(50));
+
+    // Validate changed line number to line content map for source chunk
+    Map<Integer, String> sourceChangedLinesMap =
+        diffChunk.sourceLineRange().getChangedLineNumberToLineContentMap();
+    assertNotNull(sourceChangedLinesMap);
+    assertEquals(1, sourceChangedLinesMap.size());
+    assertEquals("      // (b) Convert to our domain model", sourceChangedLinesMap.get(49));
   }
 }
