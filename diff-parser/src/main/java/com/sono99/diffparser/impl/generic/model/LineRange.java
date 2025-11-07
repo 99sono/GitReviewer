@@ -1,6 +1,8 @@
 package com.sono99.diffparser.impl.generic.model;
 
 import com.github.difflib.patch.Chunk;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Represents a contiguous range of lines within a diff, typically corresponding to either the
@@ -100,5 +102,18 @@ public record LineRange(
    */
   public String getChunkLinesAsString() {
     return String.join("\n", originalGitHubChunk.getLines());
+  }
+
+  /**
+   * Returns a list of 1-based line numbers where changes occurred within this chunk.
+   *
+   * <p>This method leverages the {@link Chunk#getChangePosition()}. It's important to note that
+   * despite the name 'position', the values returned by the GitHub API are actual 1-based line
+   * numbers, not 0-based indices.
+   *
+   * @return A list of 1-based line numbers indicating change positions.
+   */
+  public List<Integer> getChangedLineNumbers() {
+    return new ArrayList<>(originalGitHubChunk.getChangePosition());
   }
 }

@@ -60,5 +60,14 @@ class ParseDiffWithLineRangeChangesTest {
     String expectedTargetLines =
         BasicTestHelper.readTestResourceToString("git_diff_02_expected_new_chunk.txt");
     assertEquals(expectedTargetLines, diffChunk.targetLineRange().getChunkLinesAsString());
+
+    // Validate changed line numbers for source chunk
+    assertEquals(1, diffChunk.sourceLineRange().getChangedLineNumbers().size());
+    assertTrue(diffChunk.sourceLineRange().getChangedLineNumbers().contains(49));
+
+    // Validate changed line numbers for target chunk
+    assertEquals(2, diffChunk.targetLineRange().getChangedLineNumbers().size());
+    assertTrue(diffChunk.targetLineRange().getChangedLineNumbers().contains(45));
+    assertTrue(diffChunk.targetLineRange().getChangedLineNumbers().contains(50));
   }
 }
