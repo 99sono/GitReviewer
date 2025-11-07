@@ -139,16 +139,8 @@ public class DiffParserService {
               targetChunk.getPosition(), targetChunk.last(), targetChunk, targetChangeType);
     }
 
-    // (e) Extract context lines (before/after the changes)
-    String contextBefore = extractContextLines(sourceChunk.getLines(), true);
-    String contextAfter = extractContextLines(targetChunk.getLines(), false);
-
     return new DiffChunk(
-        sourceLineRange,
-        targetLineRange,
-        contextBefore,
-        contextAfter,
-        delta // Preserve original for lazy text extraction
+        sourceLineRange, targetLineRange, delta // Preserve original for lazy text extraction
         );
   }
 
@@ -166,28 +158,6 @@ public class DiffParserService {
       case CHANGE -> LineRange.ChangeType.CHANGE;
       case EQUAL -> LineRange.ChangeType.EQUAL;
     };
-  }
-
-  /**
-   * Extracts context lines from a list of lines, typically the first few lines before/after
-   * changes.
-   *
-   * @param lines the list of lines from the delta
-   * @param isBefore true if extracting context before changes, false for after
-   * @return formatted context string
-   */
-  private String extractContextLines(List<String> lines, boolean isBefore) {
-    if (lines.isEmpty()) {
-      return "";
-    }
-
-    // Take first 3 lines as context
-    int contextLines = Math.min(3, lines.size());
-    List<String> context = lines.subList(0, contextLines);
-
-    return context.stream()
-        .map(line -> isBefore ? line : "+" + line)
-        .collect(Collectors.joining("\n"));
   }
 
   /**

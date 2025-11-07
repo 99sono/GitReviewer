@@ -10,16 +10,10 @@ import java.util.List;
  *
  * @param sourceLineRange the line range in the source file (nullable for file creation)
  * @param targetLineRange the line range in the target file (nullable for file deletion)
- * @param contextBefore the context lines before the changes
- * @param contextAfter the context lines after the changes
  * @param originalDelta the original java-diff-utils AbstractDelta object for lazy text extraction
  */
 public record DiffChunk(
-    LineRange sourceLineRange,
-    LineRange targetLineRange,
-    String contextBefore,
-    String contextAfter,
-    AbstractDelta<String> originalDelta) {
+    LineRange sourceLineRange, LineRange targetLineRange, AbstractDelta<String> originalDelta) {
 
   /**
    * Gets all line ranges of a specific change type by combining source and target ranges.

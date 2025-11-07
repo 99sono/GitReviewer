@@ -10,9 +10,8 @@ import com.sono99.diffparser.impl.generic.model.DiffChunk;
 import com.sono99.diffparser.impl.generic.model.DiffedFile;
 import com.sono99.diffparser.impl.generic.model.LineRange;
 import com.sono99.diffparser.impl.generic.model.ParsedDiff;
+import com.sono99.diffparser.impl.utils.BasicTestHelper;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -41,7 +40,7 @@ class DiffParserServiceTest {
   @Test
   void shouldParseGitDiff01Successfully() throws IOException {
     // Given
-    String diffContent = readDiffContent("git_diff_01.diff");
+    String diffContent = BasicTestHelper.readTestResourceToString("git_diff_01.diff");
 
     // When
     ParsedDiff parsedDiff = diffParserService.parseUnifiedDiff(diffContent);
@@ -61,7 +60,7 @@ class DiffParserServiceTest {
   @Test
   void shouldDetectFileDeletion() throws IOException {
     // Given
-    String diffContent = readDiffContent("git_diff_01.diff");
+    String diffContent = BasicTestHelper.readTestResourceToString("git_diff_01.diff");
     String deletedOldFilePathExpected = "java-parser/ACTIONPLAN.md";
     String deletedFileNewFilePathExpected = "/dev/null";
 
@@ -93,7 +92,7 @@ class DiffParserServiceTest {
   @Test
   void shouldDetectFileCreation() throws IOException {
     // Given
-    String diffContent = readDiffContent("git_diff_01.diff");
+    String diffContent = BasicTestHelper.readTestResourceToString("git_diff_01.diff");
     String createdFilePath =
         "java-parser/src/main/java/com/sono99/javaparser/api/v1/model/AbstractJavaNodeV1.java";
 
@@ -124,7 +123,7 @@ class DiffParserServiceTest {
   @Test
   void shouldDetectFileModification() throws IOException {
     // Given
-    String diffContent = readDiffContent("git_diff_01.diff");
+    String diffContent = BasicTestHelper.readTestResourceToString("git_diff_01.diff");
     String modifiedFilePath = "java-parser/pom.xml";
 
     // When
@@ -155,7 +154,7 @@ class DiffParserServiceTest {
   @Test
   void shouldDetectFileRename() throws IOException {
     // Given
-    String diffContent = readDiffContent("git_diff_03_rename.diff");
+    String diffContent = BasicTestHelper.readTestResourceToString("git_diff_03_rename.diff");
     String oldFilePath = "old_file.txt";
     String newFilePath = "new_file.txt";
 
@@ -188,7 +187,7 @@ class DiffParserServiceTest {
   @Test
   void shouldHandleLineRangesForNewFile() throws IOException {
     // Given
-    String diffContent = readDiffContent("git_diff_01.diff");
+    String diffContent = BasicTestHelper.readTestResourceToString("git_diff_01.diff");
     String newFilePath =
         "java-parser/src/main/java/com/sono99/javaparser/api/v1/model/JavadocNodeV1.java";
 
@@ -229,7 +228,7 @@ class DiffParserServiceTest {
   @Test
   void shouldValidateDiffChunkContentForModifiedFile() throws IOException {
     // Given
-    String diffContent = readDiffContent("git_diff_01.diff");
+    String diffContent = BasicTestHelper.readTestResourceToString("git_diff_01.diff");
     String modifiedFilePath = "java-parser/pom.xml";
 
     // When
@@ -275,7 +274,7 @@ class DiffParserServiceTest {
   @Test
   void shouldValidateLineRangeChangeTypes() throws IOException {
     // Given
-    String diffContent = readDiffContent("git_diff_01.diff");
+    String diffContent = BasicTestHelper.readTestResourceToString("git_diff_01.diff");
 
     // When
     ParsedDiff parsedDiff = diffParserService.parseUnifiedDiff(diffContent);
@@ -354,10 +353,5 @@ class DiffParserServiceTest {
         LineRange.ChangeType.CHANGE,
         newChunk.targetLineRange().changeType(),
         "Change type for new target should be Change");
-  }
-
-  private String readDiffContent(String resourceFileName) throws IOException {
-    Path resourcePath = Path.of("src/test/resources/diff-examples/" + resourceFileName);
-    return Files.readString(resourcePath);
   }
 }

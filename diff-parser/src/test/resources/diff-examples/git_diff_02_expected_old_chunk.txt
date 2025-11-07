@@ -1,0 +1,11 @@
+  public ParsedDiff parseUnifiedDiff(String diffContent) {
+    try {
+      // (a) Parse using java-diff-utils library
+      InputStream inputStream =
+          new ByteArrayInputStream(diffContent.getBytes(StandardCharsets.UTF_8));
+      UnifiedDiff unifiedDiff = UnifiedDiffReader.parseUnifiedDiff(inputStream);
+
+      // (b) Convert to our domain model
+      List<DiffedFile> diffedFiles =
+          unifiedDiff.getFiles().stream()
+              .map(this::convertUnifiedDiffFile)

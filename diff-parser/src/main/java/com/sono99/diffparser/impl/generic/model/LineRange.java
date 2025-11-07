@@ -92,4 +92,13 @@ public record LineRange(
   public boolean containsLineIndex(int lineIndexNumber) {
     return lineIndexNumber >= startLineIndex && lineIndexNumber <= endLineIndex;
   }
+
+  /**
+   * Returns the lines of code associated with this chunk as a single string, joined by newlines.
+   *
+   * @return A string containing all lines of the original GitHub chunk.
+   */
+  public String getChunkLinesAsString() {
+    return String.join("\n", originalGitHubChunk.getLines());
+  }
 }

@@ -9,9 +9,8 @@ import com.sono99.diffparser.impl.generic.model.DiffChunk;
 import com.sono99.diffparser.impl.generic.model.DiffedFile;
 import com.sono99.diffparser.impl.generic.model.LineRange;
 import com.sono99.diffparser.impl.generic.model.ParsedDiff;
+import com.sono99.diffparser.impl.utils.BasicTestHelper;
 import java.io.IOException;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.List;
 import org.junit.jupiter.api.Test;
 import org.slf4j.Logger;
@@ -29,13 +28,6 @@ class ParseDiffWithLineAdditionAndModificationTest {
 
   @Autowired private DiffParserService diffParserService;
 
-  /**
-   * Helper method to read the content of a diff file from the test resources.
-   *
-   * @param resourceFileName The name of the diff file (e.g., "git_diff_02.diff").
-   * @return The content of the diff file as a String.
-   * @throws IOException If an error occurs while reading the file.
-   */
   @Test
   void contextLoads() {
     assertNotNull(diffParserService);
@@ -49,7 +41,7 @@ class ParseDiffWithLineAdditionAndModificationTest {
   @Test
   void shouldParseGitDiff02Successfully() throws IOException {
     // Given
-    String diffContent = readDiffContent("git_diff_02.diff");
+    String diffContent = BasicTestHelper.readTestResourceToString("git_diff_02.diff");
 
     // When
     ParsedDiff parsedDiff = diffParserService.parseUnifiedDiff(diffContent);
@@ -67,7 +59,7 @@ class ParseDiffWithLineAdditionAndModificationTest {
   @Test
   void shouldIdentifyDiffParserServiceFile() throws IOException {
     // Given
-    String diffContent = readDiffContent("git_diff_02.diff");
+    String diffContent = BasicTestHelper.readTestResourceToString("git_diff_02.diff");
     String targetFilePath =
         "diff-parser/src/main/java/com/sono99/diffparser/impl/generic/service/DiffParserService.java";
 
@@ -96,7 +88,7 @@ class ParseDiffWithLineAdditionAndModificationTest {
   @Test
   void shouldValidateLineRangesForSpecificChanges() throws IOException {
     // Given
-    String diffContent = readDiffContent("git_diff_02.diff");
+    String diffContent = BasicTestHelper.readTestResourceToString("git_diff_02.diff");
     String targetFilePath =
         "diff-parser/src/main/java/com/sono99/diffparser/impl/generic/service/DiffParserService.java";
 
@@ -196,7 +188,7 @@ class ParseDiffWithLineAdditionAndModificationTest {
   @Test
   void shouldDetectLineAdditionAtSpecificLine() throws IOException {
     // Given
-    String diffContent = readDiffContent("git_diff_02.diff");
+    String diffContent = BasicTestHelper.readTestResourceToString("git_diff_02.diff");
     String targetFilePath =
         "diff-parser/src/main/java/com/sono99/diffparser/impl/generic/service/DiffParserService.java";
     String addedLineContent =
@@ -240,7 +232,7 @@ class ParseDiffWithLineAdditionAndModificationTest {
   @Test
   void shouldDetectLineModificationAtSpecificLine() throws IOException {
     // Given
-    String diffContent = readDiffContent("git_diff_02.diff");
+    String diffContent = BasicTestHelper.readTestResourceToString("git_diff_02.diff");
     String targetFilePath =
         "diff-parser/src/main/java/com/sono99/diffparser/impl/generic/service/DiffParserService.java";
     String modifiedLineContent =
@@ -281,17 +273,5 @@ class ParseDiffWithLineAdditionAndModificationTest {
         modifiedLineContent,
         targetLines.get(8),
         "Modified line content mismatch at expected index");
-  }
-
-  /**
-   * Helper method to read the content of a diff file from the test resources.
-   *
-   * @param resourceFileName The name of the diff file (e.g., "git_diff_02.diff").
-   * @return The content of the diff file as a String.
-   * @throws IOException If an error occurs while reading the file.
-   */
-  private String readDiffContent(String resourceFileName) throws IOException {
-    Path resourcePath = Path.of("src/test/resources/diff-examples/" + resourceFileName);
-    return Files.readString(resourcePath);
   }
 }
