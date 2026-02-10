@@ -10,12 +10,25 @@ import org.springframework.stereotype.Component;
 @Component
 public class LineRangeConverterV1 implements NodeConverterV1<LineRange, LineRangeV1> {
 
+  /**
+   * Converts a generic {@link LineRange} to a {@link LineRangeV1}.
+   *
+   * @param source the generic model
+   * @param conversionService the conversion service
+   * @return the v1 DTO
+   */
   @Override
   public LineRangeV1 convert(LineRange source, ConversionServiceV1 conversionService) {
     return new LineRangeV1(
         source.startLineIndex(), source.endLineIndex(), convertChangeType(source.changeType()));
   }
 
+  /**
+   * Converts the change type from generic to v1.
+   *
+   * @param source the generic change type
+   * @return the v1 change type
+   */
   private LineRangeV1.ChangeType convertChangeType(LineRange.ChangeType source) {
     return switch (source) {
       case INSERT -> LineRangeV1.ChangeType.INSERT;
@@ -25,11 +38,21 @@ public class LineRangeConverterV1 implements NodeConverterV1<LineRange, LineRang
     };
   }
 
+  /**
+   * Gets the class of the source type.
+   *
+   * @return the source type class
+   */
   @Override
   public Class<LineRange> getSourceType() {
     return LineRange.class;
   }
 
+  /**
+   * Gets the class of the target type.
+   *
+   * @return the target type class
+   */
   @Override
   public Class<LineRangeV1> getTargetType() {
     return LineRangeV1.class;

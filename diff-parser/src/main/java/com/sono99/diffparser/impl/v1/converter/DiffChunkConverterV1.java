@@ -12,6 +12,13 @@ import org.springframework.stereotype.Component;
 @Component
 public class DiffChunkConverterV1 implements NodeConverterV1<DiffChunk, DiffChunkV1> {
 
+  /**
+   * Converts a generic {@link DiffChunk} to a {@link DiffChunkV1}.
+   *
+   * @param source the generic model
+   * @param conversionService the conversion service
+   * @return the v1 DTO
+   */
   @Override
   public DiffChunkV1 convert(DiffChunk source, ConversionServiceV1 conversionService) {
     List<LineRangeV1> lineRanges = List.of();
@@ -31,11 +38,21 @@ public class DiffChunkConverterV1 implements NodeConverterV1<DiffChunk, DiffChun
         ""); // diffText - not available
   }
 
+  /**
+   * Gets the class of the source type.
+   *
+   * @return the source type class
+   */
   @Override
   public Class<DiffChunk> getSourceType() {
     return DiffChunk.class;
   }
 
+  /**
+   * Gets the class of the target type.
+   *
+   * @return the target type class
+   */
   @Override
   public Class<DiffChunkV1> getTargetType() {
     return DiffChunkV1.class;

@@ -13,6 +13,13 @@ import org.springframework.stereotype.Component;
 @Component
 public class DiffedFileConverterV1 implements NodeConverterV1<DiffedFile, DiffedFileV1> {
 
+  /**
+   * Converts a generic {@link DiffedFile} to a {@link DiffedFileV1}.
+   *
+   * @param source the generic model
+   * @param conversionService the conversion service
+   * @return the v1 DTO
+   */
   @Override
   public DiffedFileV1 convert(DiffedFile source, ConversionServiceV1 conversionService) {
     List<DiffChunkV1> diffChunks =
@@ -31,11 +38,21 @@ public class DiffedFileConverterV1 implements NodeConverterV1<DiffedFile, Diffed
         ""); // diffText - not available in generic model
   }
 
+  /**
+   * Gets the class of the source type.
+   *
+   * @return the source type class
+   */
   @Override
   public Class<DiffedFile> getSourceType() {
     return DiffedFile.class;
   }
 
+  /**
+   * Gets the class of the target type.
+   *
+   * @return the target type class
+   */
   @Override
   public Class<DiffedFileV1> getTargetType() {
     return DiffedFileV1.class;

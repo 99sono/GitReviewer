@@ -428,7 +428,7 @@ class DiffParserServiceTest {
     ParsedDiff parsedDiff = diffParserService.parseUnifiedDiff(emptyDiff);
 
     // Then
-    assertTrue(parsedDiff.isValid());
+    assertFalse(parsedDiff.isValid());
     assertEquals(0, parsedDiff.topLevelResult().totalFilesChanged());
     assertEquals(0, parsedDiff.topLevelResult().totalAdditions());
     assertEquals(0, parsedDiff.topLevelResult().totalDeletions());
