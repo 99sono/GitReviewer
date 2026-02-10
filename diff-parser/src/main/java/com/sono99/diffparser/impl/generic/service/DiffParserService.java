@@ -40,6 +40,16 @@ public class DiffParserService {
    * @return ParsedDiff containing the parsed diff information, or invalid result on error
    */
   public ParsedDiff parseUnifiedDiff(String diffContent) {
+    // Validate input
+    if (diffContent == null || diffContent.trim().isEmpty()) {
+      return new ParsedDiff(
+          new TopLevelDiffResult(List.of(), "", 0, 0, 0), // Empty result
+          diffContent,
+          null, // No original unified diff file
+          false // Mark as invalid
+          );
+    }
+
     try {
       // (a) Parse using java-diff-utils library
       InputStream inputStream =
@@ -52,12 +62,27 @@ public class DiffParserService {
               .map(this::convertUnifiedDiffFile)
               .collect(Collectors.toList());
 
-      // (c) Create top-level result with statistics
+      // Validate that we have files
+      if (diffedFiles.isEmpty()) {
+        return new ParsedDiff(
+            new TopLevelDiffResult(List.of(), "", 0, 0, 0), // Empty result
+            diffContent,
+            unifiedDiff, // Parsed but empty
+            false // Mark as invalid
+            );
+      }
+
+      // (c) Calculate metrics
+      int totalAdditions = countAdditionsFromDiff(diffContent);
+      int totalDeletions = countDeletionsFromDiff(diffContent);
+
+      // (d) Create top-level result with statistics
       String diffHeader = extractDiffHeader(unifiedDiff);
       int totalFilesChanged = diffedFiles.size();
 
       TopLevelDiffResult topLevelResult =
-          new TopLevelDiffResult(diffedFiles, diffHeader, totalFilesChanged);
+          new TopLevelDiffResult(
+              diffedFiles, diffHeader, totalFilesChanged, totalAdditions, totalDeletions);
 
       return new ParsedDiff(topLevelResult, diffContent, unifiedDiff, true);
 
@@ -65,7 +90,7 @@ public class DiffParserService {
       // (e) Handle parsing errors gracefully
       LOGGER.warn("Failed to parse unified diff: {}", e.getMessage(), e);
       return new ParsedDiff(
-          new TopLevelDiffResult(List.of(), "", 0), // Empty result
+          new TopLevelDiffResult(List.of(), "", 0, 0, 0), // Empty result
           diffContent,
           null, // No original unified diff file
           false // Mark as invalid
@@ -186,5 +211,53 @@ public class DiffParserService {
    */
   private String extractDiffHeader(UnifiedDiff unifiedDiff) {
     return unifiedDiff.getHeader() != null ? unifiedDiff.getHeader() : "";
+  }
+
+  /**
+   * Calculates the total number of additions across all deltas in the unified diff.
+   *
+   * @param unifiedDiff the parsed unified diff
+   * @return total number of additions
+   */
+  private int calculateTotalAdditions(UnifiedDiff unifiedDiff) {
+    return unifiedDiff.getFiles().stream()
+        .flatMap(file -> file.getPatch().getDeltas().stream())
+        .mapToInt(delta -> delta.getTarget().size())
+        .sum();
+  }
+
+  /**
+   * Calculates the total number of deletions across all deltas in the unified diff.
+   *
+   * @param unifiedDiff the parsed unified diff
+   * @return total number of deletions
+   */
+  private int calculateTotalDeletions(UnifiedDiff unifiedDiff) {
+    return unifiedDiff.getFiles().stream()
+        .flatMap(file -> file.getPatch().getDeltas().stream())
+        .mapToInt(delta -> delta.getSource().size())
+        .sum();
+  }
+
+  /**
+   * Counts the total number of addition lines in the diff content.
+   *
+   * @param diffContent the diff content as string
+   * @return total number of additions
+   */
+  private int countAdditionsFromDiff(String diffContent) {
+    return (int)
+        diffContent.lines().filter(line -> line.startsWith("+") && !line.startsWith("+++")).count();
+  }
+
+  /**
+   * Counts the total number of deletion lines in the diff content.
+   *
+   * @param diffContent the diff content as string
+   * @return total number of deletions
+   */
+  private int countDeletionsFromDiff(String diffContent) {
+    return (int)
+        diffContent.lines().filter(line -> line.startsWith("-") && !line.startsWith("---")).count();
   }
 }

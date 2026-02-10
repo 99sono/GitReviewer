@@ -19,7 +19,7 @@
         <project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
 
         <!-- Dependency versions -->
-        <spring-boot.version>3.3.4</spring-boot.version>
+        <spring-boot.version>3.4.2</spring-boot.version>
         <javaparser.version>3.27.0</javaparser.version>
         <github-api.version>1.326</github-api.version>
         <langchain4j.version>0.35.0</langchain4j.version>

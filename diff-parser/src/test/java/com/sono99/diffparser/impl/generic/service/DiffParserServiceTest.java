@@ -354,4 +354,165 @@ class DiffParserServiceTest {
         newChunk.targetLineRange().changeType(),
         "Change type for new target should be Change");
   }
+
+  /**
+   * Validates that the totalFilesChanged count is correct. Counts the number of file entries in
+   * git_diff_01.diff and asserts that getTotalFilesChanged() returns the expected number.
+   */
+  @Test
+  void shouldValidateTotalFilesChanged() throws IOException {
+    // Given
+    String diffContent = BasicTestHelper.readTestResourceToString("git_diff_01.diff");
+
+    // When
+    ParsedDiff parsedDiff = diffParserService.parseUnifiedDiff(diffContent);
+
+    // Then
+    assertTrue(parsedDiff.isValid());
+    // Count the number of 'diff --git' lines
+    long expectedFilesChanged =
+        diffContent.lines().filter(line -> line.startsWith("diff --git")).count();
+    assertEquals(expectedFilesChanged, parsedDiff.topLevelResult().totalFilesChanged());
+  }
+
+  /**
+   * Validates that the totalAdditions count is correct. Manually counts the number of addition
+   * lines in git_diff_01.diff and asserts that getTotalAdditions() returns the expected number.
+   */
+  @Test
+  void shouldValidateTotalAdditions() throws IOException {
+    // Given
+    String diffContent = BasicTestHelper.readTestResourceToString("git_diff_01.diff");
+
+    // When
+    ParsedDiff parsedDiff = diffParserService.parseUnifiedDiff(diffContent);
+
+    // Then
+    assertTrue(parsedDiff.isValid());
+    // Count lines starting with '+' but not '+++'
+    long expectedAdditions =
+        diffContent.lines().filter(line -> line.startsWith("+") && !line.startsWith("+++")).count();
+    assertEquals(expectedAdditions, parsedDiff.topLevelResult().totalAdditions());
+  }
+
+  /**
+   * Validates that the totalDeletions count is correct. Manually counts the number of deletion
+   * lines in git_diff_01.diff and asserts that getTotalDeletions() returns the expected number.
+   */
+  @Test
+  void shouldValidateTotalDeletions() throws IOException {
+    // Given
+    String diffContent = BasicTestHelper.readTestResourceToString("git_diff_01.diff");
+
+    // When
+    ParsedDiff parsedDiff = diffParserService.parseUnifiedDiff(diffContent);
+
+    // Then
+    assertTrue(parsedDiff.isValid());
+    // Count lines starting with '-' but not '---'
+    long expectedDeletions =
+        diffContent.lines().filter(line -> line.startsWith("-") && !line.startsWith("---")).count();
+    assertEquals(expectedDeletions, parsedDiff.topLevelResult().totalDeletions());
+  }
+
+  /**
+   * Tests that the service correctly handles an empty diff string. Asserts that the result is
+   * marked as invalid and that all statistics are zero.
+   */
+  @Test
+  void shouldHandleEmptyDiffString() {
+    // Given
+    String emptyDiff = "";
+
+    // When
+    ParsedDiff parsedDiff = diffParserService.parseUnifiedDiff(emptyDiff);
+
+    // Then
+    assertTrue(parsedDiff.isValid());
+    assertEquals(0, parsedDiff.topLevelResult().totalFilesChanged());
+    assertEquals(0, parsedDiff.topLevelResult().totalAdditions());
+    assertEquals(0, parsedDiff.topLevelResult().totalDeletions());
+  }
+
+  /**
+   * Tests that the service correctly handles a malformed diff string. Asserts that the result is
+   * invalid and statistics are zero. The service should not throw an unhandled exception.
+   */
+  @Test
+  void shouldHandleMalformedDiffString() {
+    // Given
+    String malformedDiff = "hello world\nnot a diff";
+
+    // When
+    ParsedDiff parsedDiff = diffParserService.parseUnifiedDiff(malformedDiff);
+
+    // Then
+    assertFalse(parsedDiff.isValid());
+    assertEquals(0, parsedDiff.topLevelResult().totalFilesChanged());
+    assertEquals(0, parsedDiff.topLevelResult().totalAdditions());
+    assertEquals(0, parsedDiff.topLevelResult().totalDeletions());
+  }
+
+  /**
+   * Tests that the service correctly handles a diff with no changes. Parses a diff file that
+   * contains file headers but no actual hunks or changes. Asserts that statistics are zero.
+   */
+  @Test
+  void shouldHandleDiffWithNoChanges() {
+    // Given: A diff with file headers but no changes
+    String noChangesDiff =
+        """
+        diff --git a/test.txt b/test.txt
+        index 1234567..abcdef0 100644
+        --- a/test.txt
+        +++ b/test.txt
+        """;
+
+    // When
+    ParsedDiff parsedDiff = diffParserService.parseUnifiedDiff(noChangesDiff);
+
+    // Then
+    assertTrue(parsedDiff.isValid()); // Valid diff structure, just no changes
+    assertEquals(1, parsedDiff.topLevelResult().totalFilesChanged()); // One file mentioned
+    assertEquals(0, parsedDiff.topLevelResult().totalAdditions());
+    assertEquals(0, parsedDiff.topLevelResult().totalDeletions());
+  }
+
+  /**
+   * Tests a single-file, single-hunk diff. Performs all detailed assertions from Phase 3 on this
+   * simple case to isolate logic.
+   */
+  @Test
+  void shouldHandleSingleFileSingleHunkDiff() {
+    // Given: Minimal diff with one file and one hunk
+    String singleFileDiff =
+        """
+        diff --git a/test.txt b/test.txt
+        index 1234567..abcdef0 100644
+        --- a/test.txt
+        +++ b/test.txt
+        @@ -1,2 +1,3 @@
+         line1
+        -line2
+        +line2 modified
+        +line3
+        """;
+
+    // When
+    ParsedDiff parsedDiff = diffParserService.parseUnifiedDiff(singleFileDiff);
+
+    // Then
+    assertTrue(parsedDiff.isValid());
+    assertEquals(1, parsedDiff.topLevelResult().totalFilesChanged());
+    assertEquals(2, parsedDiff.topLevelResult().totalAdditions()); // +line2 modified, +line3
+    assertEquals(1, parsedDiff.topLevelResult().totalDeletions()); // -line2
+
+    // Validate file details
+    assertEquals(1, parsedDiff.topLevelResult().diffedFiles().size());
+    DiffedFile file = parsedDiff.topLevelResult().diffedFiles().get(0);
+    assertEquals("test.txt", file.filePath());
+    assertFalse(file.isDeleted());
+    assertFalse(file.isCreatedNewInMergeRequest());
+    assertFalse(file.isRenamed());
+  }
 }

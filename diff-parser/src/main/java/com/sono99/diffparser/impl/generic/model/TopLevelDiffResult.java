@@ -9,9 +9,15 @@ import java.util.List;
  * @param diffedFiles the list of diffed files
  * @param diffHeader the header of the diff
  * @param totalFilesChanged the total number of files changed
+ * @param totalAdditions the total number of additions
+ * @param totalDeletions the total number of deletions
  */
 public record TopLevelDiffResult(
-    List<DiffedFile> diffedFiles, String diffHeader, int totalFilesChanged) {
+    List<DiffedFile> diffedFiles,
+    String diffHeader,
+    int totalFilesChanged,
+    int totalAdditions,
+    int totalDeletions) {
   /**
    * Gets all line ranges from all files.
    *
